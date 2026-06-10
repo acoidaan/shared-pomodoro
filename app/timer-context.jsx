@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { saveSession } from "../lib/sessions";
+import { supabase } from "../lib/supabaseClient";
 
 export const CYCLES_BEFORE_LONG_BREAK = 4;
 
@@ -93,6 +94,11 @@ export function TimerProvider({ children }) {
   const [completedPomodoros, setCompletedPomodoros] = useState(0);
   const [saveError, setSaveError] = useState("");
 
+  // Sala en tiempo real (Supabase Presence)
+  const [friends, setFriends] = useState([]);
+  const [presenceReady, setPresenceReady] = useState(false);
+  const channelRef = useRef(null);
+
   const endAtRef = useRef(null);
   const intervalRef = useRef(null);
 
@@ -138,9 +144,57 @@ export function TimerProvider({ children }) {
     }
   }, [remaining, running, mode, phase]);
 
+  // ---- Sala en tiempo real -------------------------------------------------
+  // Cada cliente entra a un canal de presencia con su nombre como clave y
+  // publica su estado (fase, si corre, cuándo termina). No usa la base de
+  // datos: es un websocket efímero, al cerrar la pestaña desapareces solo.
+  useEffect(() => {
+    if (!supabase || !name.trim()) return;
+    const channel = supabase.channel("sala-comun", {
+      config: { presence: { key: name.trim() } },
+    });
+    channelRef.current = channel;
+    channel.on("presence", { event: "sync" }, () => {
+      const state = channel.presenceState();
+      setFriends(
+        Object.entries(state).map(([key, metas]) => ({
+          key,
+          ...metas[metas.length - 1],
+        })),
+      );
+    });
+    channel.subscribe((status) => {
+      if (status === "SUBSCRIBED") setPresenceReady(true);
+    });
+    return () => {
+      setPresenceReady(false);
+      setFriends([]);
+      supabase.removeChannel(channel);
+      channelRef.current = null;
+    };
+  }, [name]);
+
+  // Publicar mi estado cuando cambia algo relevante
+  useEffect(() => {
+    const channel = channelRef.current;
+    if (!channel || !presenceReady) return;
+    channel.track({
+      mode,
+      phase,
+      running,
+      endAt: running ? endAtRef.current : null,
+      total,
+      updatedAt: Date.now(),
+    });
+  }, [presenceReady, running, phase, mode, total]);
+
   const handleComplete = useCallback(() => {
     setRunning(false);
     playChime();
+
+    // Minutos reales de la sesión (importante al unirse al pomodoro de otro,
+    // que puede durar distinto que tus propios ajustes)
+    const sessionMinutes = Math.max(1, Math.round(total / 60));
 
     if (mode === "timer") {
       notify("¡Tiempo completado!");
@@ -148,7 +202,7 @@ export function TimerProvider({ children }) {
       saveSession({
         name: name.trim(),
         mode: "timer",
-        minutes: timerMin,
+        minutes: sessionMinutes,
       }).catch(() =>
         setSaveError(
           "No se pudo guardar la sesión. Revisa tu conexión o la configuración de Supabase.",
@@ -167,7 +221,7 @@ export function TimerProvider({ children }) {
       saveSession({
         name: name.trim(),
         mode: "pomodoro",
-        minutes: workMin,
+        minutes: sessionMinutes,
       }).catch(() =>
         setSaveError(
           "No se pudo guardar la sesión. Revisa tu conexión o la configuración de Supabase.",
@@ -199,6 +253,7 @@ export function TimerProvider({ children }) {
     mode,
     phase,
     name,
+    total,
     timerMin,
     workMin,
     breakMin,
@@ -272,6 +327,18 @@ export function TimerProvider({ children }) {
     [mode, timerMin, workMin],
   );
 
+  // Engancharse a la sesión en curso de un amigo: mismo fin, mismo reloj.
+  const joinSession = useCallback((friend) => {
+    if (!friend.running || !friend.endAt || friend.endAt <= Date.now()) return;
+    unlockAudio();
+    setMode(friend.mode);
+    setPhase(friend.mode === "timer" ? "work" : friend.phase);
+    setTotal(friend.total);
+    setRemaining((friend.endAt - Date.now()) / 1000);
+    endAtRef.current = friend.endAt;
+    setRunning(true);
+  }, []);
+
   const value = {
     name,
     nameLoaded,
@@ -291,11 +358,13 @@ export function TimerProvider({ children }) {
     total,
     completedPomodoros,
     saveError,
+    friends,
     start,
     pause,
     reset,
     skipPhase,
     switchMode,
+    joinSession,
   };
 
   return (

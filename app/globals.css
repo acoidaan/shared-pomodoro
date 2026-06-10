@@ -515,6 +515,109 @@ a {
   margin-bottom: 24px;
 }
 
+/* ---------- Sala en tiempo real ---------- */
+
+.friends-panel {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.friends-title {
+  font-size: 1.05rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.friends-count {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.friends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.friend-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.friend-name {
+  font-weight: 600;
+  flex: 0 0 auto;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.friend-name small {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.friend-status {
+  flex: 1;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.friend-status.focusing {
+  color: var(--accent);
+}
+
+.friend-countdown {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.join-btn {
+  padding: 7px 16px;
+  font-size: 0.85rem;
+  border-radius: 999px;
+}
+
+.join-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.friends-hint {
+  color: var(--text-dim);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .friend-row {
+    flex-wrap: wrap;
+  }
+
+  .friend-status {
+    flex-basis: 100%;
+    order: 3;
+    padding-left: 42px;
+  }
+}
+
 /* ---------- Estadísticas ---------- */
 
 .stats-header {

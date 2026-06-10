@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { hasSupabase } from "../lib/supabaseClient";
+import { avatarColor } from "../lib/avatar";
+import FriendsPanel from "./friends-panel";
 import {
   CYCLES_BEFORE_LONG_BREAK,
   formatTime,
@@ -9,22 +11,6 @@ import {
 } from "./timer-context";
 
 const TIMER_PRESETS = [10, 15, 25, 30, 45, 60, 90];
-
-const AVATAR_COLORS = [
-  "#ff6347",
-  "#f59e0b",
-  "#4ade80",
-  "#60a5fa",
-  "#a78bfa",
-  "#f472b6",
-  "#2dd4bf",
-];
-
-function avatarColor(name) {
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
-  return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
 
 function Stepper({ label, value, onChange, step = 5, min = 1, max = 180 }) {
   return (
@@ -313,6 +299,8 @@ export default function TimerPage() {
           </p>
         )}
       </div>
+
+      <FriendsPanel />
     </div>
   );
 }

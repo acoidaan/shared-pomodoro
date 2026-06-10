@@ -89,6 +89,12 @@ variables de entorno con `vercel env add NEXT_PUBLIC_SUPABASE_URL` y
   quede en segundo plano. Suena un aviso y manda notificación al terminar.
 - **Estadísticas** (`app/stats/page.jsx`): ranking semanal con barras, totales
   del grupo y feed de actividad reciente. Tu nombre aparece resaltado.
+- **Sala en tiempo real** (`app/friends-panel.jsx` + presencia en
+  `app/timer-context.jsx`): todos los que tienen la página abierta aparecen en
+  el panel «En la sala ahora», con su estado (concentrado/descansando) y cuánto
+  les queda, en directo vía Supabase Realtime Presence. El botón «Unirme»
+  sincroniza tu reloj con el de un amigo para terminar a la vez. No usa la base
+  de datos: al cerrar la pestaña desapareces de la sala automáticamente.
 - **Datos** (`lib/sessions.js`): cada sesión completada se inserta en la tabla
   `sessions` de Supabase con nombre, modo, minutos y fecha. Sin Supabase
   configurado, guarda en localStorage como fallback.
