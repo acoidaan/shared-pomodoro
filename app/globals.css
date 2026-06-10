@@ -723,6 +723,97 @@ a {
   }
 }
 
+/* Heatmap estilo GitHub */
+
+.heatmap-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.heatmap-inner {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: max-content;
+}
+
+.hm-months {
+  display: flex;
+  gap: 3px;
+  margin-left: 18px;
+}
+
+.hm-month {
+  width: 11px;
+  flex: 0 0 11px;
+  font-size: 9px;
+  color: var(--text-dim);
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.heatmap {
+  display: flex;
+  gap: 3px;
+}
+
+.hm-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hm-daylabels {
+  width: 15px;
+}
+
+.hm-daylabel {
+  height: 11px;
+  font-size: 8px;
+  line-height: 11px;
+  color: var(--text-dim);
+}
+
+.hm-cell {
+  width: 11px;
+  height: 11px;
+  border-radius: 2.5px;
+  flex: 0 0 auto;
+}
+
+.hm-0 {
+  background: #232b38;
+}
+
+.hm-1 {
+  background: #1f4a2a;
+}
+
+.hm-2 {
+  background: #2d6a3c;
+}
+
+.hm-3 {
+  background: #3c9a52;
+}
+
+.hm-4 {
+  background: #4ade80;
+}
+
+.hm-future {
+  background: transparent;
+}
+
+.hm-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+  font-size: 9px;
+  color: var(--text-dim);
+}
+
 .garden-progress {
   display: flex;
   flex-direction: column;
