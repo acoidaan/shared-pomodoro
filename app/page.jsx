@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { hasSupabase } from "../lib/supabaseClient";
-import { saveSession } from "../lib/sessions";
+import {
+  CYCLES_BEFORE_LONG_BREAK,
+  formatTime,
+  useTimer,
+} from "./timer-context";
 
-const CYCLES_BEFORE_LONG_BREAK = 4;
 const TIMER_PRESETS = [10, 15, 25, 30, 45, 60, 90];
 
 const AVATAR_COLORS = [
@@ -21,42 +24,6 @@ function avatarColor(name) {
   let h = 0;
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
-}
-
-function formatTime(totalSeconds) {
-  const s = Math.max(0, Math.round(totalSeconds));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
-}
-
-function playBeep() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    [0, 0.25, 0.5].forEach((delay, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = i === 2 ? 880 : 660;
-      gain.gain.setValueAtTime(0.25, ctx.currentTime + delay);
-      gain.gain.exponentialRampToValueAtTime(
-        0.001,
-        ctx.currentTime + delay + 0.2,
-      );
-      osc.start(ctx.currentTime + delay);
-      osc.stop(ctx.currentTime + delay + 0.22);
-    });
-  } catch {
-    // sin sonido si el navegador lo bloquea
-  }
-}
-
-function notify(message) {
-  if (typeof Notification === "undefined") return;
-  if (Notification.permission === "granted") {
-    new Notification("🍅 shared pomodoro", { body: message });
-  }
 }
 
 function Stepper({ label, value, onChange, step = 5, min = 1, max = 180 }) {
@@ -88,203 +55,40 @@ function Stepper({ label, value, onChange, step = 5, min = 1, max = 180 }) {
 }
 
 export default function TimerPage() {
-  const [name, setName] = useState("");
-  const [nameLoaded, setNameLoaded] = useState(false);
+  const {
+    name,
+    nameLoaded,
+    setName,
+    mode,
+    workMin,
+    setWorkMin,
+    breakMin,
+    setBreakMin,
+    longBreakMin,
+    setLongBreakMin,
+    timerMin,
+    setTimerMin,
+    phase,
+    running,
+    remaining,
+    total,
+    completedPomodoros,
+    saveError,
+    start,
+    pause,
+    reset,
+    skipPhase,
+    switchMode,
+  } = useTimer();
+
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState("");
-
-  const [mode, setMode] = useState("pomodoro"); // 'pomodoro' | 'timer'
-
-  // Ajustes (en minutos)
-  const [workMin, setWorkMin] = useState(25);
-  const [breakMin, setBreakMin] = useState(5);
-  const [longBreakMin, setLongBreakMin] = useState(15);
-  const [timerMin, setTimerMin] = useState(30);
-
-  // Estado del temporizador
-  const [phase, setPhase] = useState("work"); // 'work' | 'break' | 'longBreak' (solo pomodoro)
-  const [running, setRunning] = useState(false);
-  const [remaining, setRemaining] = useState(25 * 60); // segundos
-  const [total, setTotal] = useState(25 * 60);
-  const [completedPomodoros, setCompletedPomodoros] = useState(0);
-  const [saveError, setSaveError] = useState("");
-
-  const endAtRef = useRef(null);
-  const intervalRef = useRef(null);
-
-  // Cargar nombre guardado
-  useEffect(() => {
-    setName(localStorage.getItem("pomodoro-amigos-name") || "");
-    setNameLoaded(true);
-  }, []);
 
   const saveName = () => {
     const clean = draftName.trim();
     if (!clean) return;
     setName(clean);
-    localStorage.setItem("pomodoro-amigos-name", clean);
     setEditingName(false);
-  };
-
-  const durationForPhase = useCallback(
-    (ph) => {
-      if (mode === "timer") return timerMin * 60;
-      if (ph === "work") return workMin * 60;
-      if (ph === "longBreak") return longBreakMin * 60;
-      return breakMin * 60;
-    },
-    [mode, timerMin, workMin, breakMin, longBreakMin],
-  );
-
-  // Si cambian los ajustes de duración con el temporizador parado, actualizar la cuenta.
-  // Ojo: `running` NO está en las dependencias a propósito — pausar no debe resetear el tiempo.
-  useEffect(() => {
-    if (running) return;
-    const d = durationForPhase(phase);
-    setRemaining(d);
-    setTotal(d);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [durationForPhase, phase]);
-
-  // Título de la pestaña
-  useEffect(() => {
-    if (running) {
-      const label =
-        mode === "timer" ? "Timer" : phase === "work" ? "Focus" : "Descanso";
-      document.title = `${formatTime(remaining)} · ${label}`;
-    } else {
-      document.title = "shared pomodoro";
-    }
-  }, [remaining, running, mode, phase]);
-
-  const handleComplete = useCallback(() => {
-    setRunning(false);
-    playBeep();
-
-    if (mode === "timer") {
-      notify("¡Tiempo completado!");
-      setSaveError("");
-      saveSession({
-        name: name.trim(),
-        mode: "timer",
-        minutes: timerMin,
-      }).catch(() =>
-        setSaveError(
-          "No se pudo guardar la sesión. Revisa tu conexión o la configuración de Supabase.",
-        ),
-      );
-      const d = timerMin * 60;
-      setRemaining(d);
-      setTotal(d);
-      return;
-    }
-
-    if (phase === "work") {
-      const done = completedPomodoros + 1;
-      setCompletedPomodoros(done);
-      setSaveError("");
-      saveSession({
-        name: name.trim(),
-        mode: "pomodoro",
-        minutes: workMin,
-      }).catch(() =>
-        setSaveError(
-          "No se pudo guardar la sesión. Revisa tu conexión o la configuración de Supabase.",
-        ),
-      );
-      const nextPhase =
-        done % CYCLES_BEFORE_LONG_BREAK === 0 ? "longBreak" : "break";
-      notify(
-        nextPhase === "longBreak"
-          ? "¡Pomodoro completado! Descanso largo 🎉"
-          : "¡Pomodoro completado! Toca descansar.",
-      );
-      setPhase(nextPhase);
-      // Los descansos empiezan solos
-      const d = nextPhase === "longBreak" ? longBreakMin * 60 : breakMin * 60;
-      setRemaining(d);
-      setTotal(d);
-      endAtRef.current = Date.now() + d * 1000;
-      setRunning(true);
-    } else {
-      notify("Descanso terminado. ¡A por el siguiente pomodoro!");
-      setPhase("work");
-      const d = workMin * 60;
-      setRemaining(d);
-      setTotal(d);
-      // El trabajo empieza cuando tú le des, sin prisa
-    }
-  }, [
-    mode,
-    phase,
-    name,
-    timerMin,
-    workMin,
-    breakMin,
-    longBreakMin,
-    completedPomodoros,
-  ]);
-
-  // Bucle del temporizador basado en timestamps (no se desincroniza si la pestaña se duerme)
-  useEffect(() => {
-    if (!running) {
-      clearInterval(intervalRef.current);
-      return;
-    }
-    intervalRef.current = setInterval(() => {
-      const left = (endAtRef.current - Date.now()) / 1000;
-      if (left <= 0) {
-        clearInterval(intervalRef.current);
-        setRemaining(0);
-        handleComplete();
-      } else {
-        setRemaining(left);
-      }
-    }, 250);
-    return () => clearInterval(intervalRef.current);
-  }, [running, handleComplete]);
-
-  const start = () => {
-    if (!name.trim()) return;
-    if (
-      typeof Notification !== "undefined" &&
-      Notification.permission === "default"
-    ) {
-      Notification.requestPermission();
-    }
-    endAtRef.current = Date.now() + remaining * 1000;
-    setRunning(true);
-  };
-
-  const pause = () => {
-    setRunning(false);
-  };
-
-  const reset = () => {
-    setRunning(false);
-    setPhase("work");
-    const d = mode === "timer" ? timerMin * 60 : workMin * 60;
-    setRemaining(d);
-    setTotal(d);
-  };
-
-  const skipPhase = () => {
-    if (mode !== "pomodoro" || phase === "work") return;
-    setRunning(false);
-    setPhase("work");
-    const d = workMin * 60;
-    setRemaining(d);
-    setTotal(d);
-  };
-
-  const switchMode = (m) => {
-    if (m === mode) return;
-    setRunning(false);
-    setMode(m);
-    setPhase("work");
-    const d = m === "timer" ? timerMin * 60 : workMin * 60;
-    setRemaining(d);
-    setTotal(d);
   };
 
   // Anillo de progreso
