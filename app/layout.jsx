@@ -20,6 +20,7 @@ export default function RootLayout({ children }) {
             <nav>
               <HeaderTimer />
               <Link href="/">Temporizador</Link>
+              <Link href="/huerto">Huerto</Link>
               <Link href="/stats">Estadísticas</Link>
             </nav>
           </header>

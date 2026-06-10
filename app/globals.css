@@ -618,6 +618,126 @@ a {
   }
 }
 
+/* ---------- Huerto ---------- */
+
+.garden-group-summary {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  padding: 14px 18px;
+  margin-bottom: 20px;
+  color: var(--text-dim);
+  font-size: 0.95rem;
+}
+
+.garden-group-summary strong {
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.gardens {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.garden-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+
+.garden-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.garden-name {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.garden-name small {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.garden-count {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.garden-plot {
+  background: linear-gradient(180deg, #1d2b1d 0%, #243122 60%, #2e2a20 100%);
+  border: 1px solid #34452f;
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: flex-end;
+  min-height: 64px;
+}
+
+.tomato {
+  font-size: 1.5rem;
+  line-height: 1;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+}
+
+.tomato:nth-child(2n) {
+  transform: rotate(-8deg);
+}
+
+.tomato:nth-child(3n) {
+  transform: rotate(7deg) translateY(-1px);
+}
+
+.tomato-more {
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 0.95rem;
+  align-self: center;
+  margin: 0 4px;
+}
+
+.plant {
+  font-size: 1.6rem;
+  line-height: 1;
+  animation: sway 3s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+
+.garden-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.garden-bar {
+  background: var(--green);
+}
+
+.garden-progress-label {
+  color: var(--text-dim);
+  font-size: 0.83rem;
+}
+
 /* ---------- Estadísticas ---------- */
 
 .stats-header {
