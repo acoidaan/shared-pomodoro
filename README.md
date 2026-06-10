@@ -1,4 +1,4 @@
-# 🍅 Pomodoro Amigos
+# 🍅 shared pomodoro
 
 Pomodoro online para usar con tus amigos: cada uno entra con el mismo link, pone su
 nombre, hace sus pomodoros (o temporizadores normales) y todos podéis ver las
@@ -16,13 +16,13 @@ npm install
 npm run dev
 ```
 
-Abre http://localhost:3000. Sin configurar nada más ya funciona, pero las sesiones
+Abre <http://localhost:3000>. Sin configurar nada más ya funciona, pero las sesiones
 se guardan solo en tu navegador. Para compartir estadísticas con tus amigos sigue
 los pasos 2 y 3.
 
 ## 2. Crear la base de datos en Supabase (gratis)
 
-1. Entra en https://supabase.com y crea una cuenta (con GitHub es un click).
+1. Entra en <https://supabase.com> y crea una cuenta (con GitHub es un click).
 2. **New project** → ponle nombre (ej. `pomodoro-amigos`), elige una contraseña
    de base de datos cualquiera y la región más cercana (Europe West). Plan **Free**.
 3. Cuando termine de crearse, ve a **SQL Editor** (icono de terminal en el menú
@@ -38,7 +38,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://abcdefgh.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...
 ```
 
-6. Reinicia `npm run dev`. Ahora las sesiones se guardan en la nube y la página
+1. Reinicia `npm run dev`. Ahora las sesiones se guardan en la nube y la página
    de estadísticas muestra a todo el mundo.
 
 > ⚠️ La `anon key` es pública por diseño (va en el navegador), no pasa nada por
@@ -53,18 +53,18 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...
 ```bash
 git init
 git add .
-git commit -m "Pomodoro Amigos"
+git commit -m "shared pomodoro"
 git branch -M main
 git remote add origin https://github.com/TU-USUARIO/pomodoro-amigos.git
 git push -u origin main
 ```
 
-2. Entra en https://vercel.com → **Add New → Project** → importa el repo.
-3. Antes de darle a Deploy, abre **Environment Variables** y añade las dos
+1. Entra en <https://vercel.com> → **Add New → Project** → importa el repo.
+2. Antes de darle a Deploy, abre **Environment Variables** y añade las dos
    variables (las mismas de tu `.env.local`):
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-4. **Deploy**. En un minuto tendrás una URL tipo
+3. **Deploy**. En un minuto tendrás una URL tipo
    `https://pomodoro-amigos.vercel.app` → **ese es el link que pasas a tus amigos**.
 
 Cada vez que hagas `git push`, Vercel redespliega solo.

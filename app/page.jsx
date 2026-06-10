@@ -1,13 +1,21 @@
-'use client';
+"use client";
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { hasSupabase } from '../lib/supabaseClient';
-import { saveSession } from '../lib/sessions';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { hasSupabase } from "../lib/supabaseClient";
+import { saveSession } from "../lib/sessions";
 
 const CYCLES_BEFORE_LONG_BREAK = 4;
 const TIMER_PRESETS = [10, 15, 25, 30, 45, 60, 90];
 
-const AVATAR_COLORS = ['#ff6347', '#f59e0b', '#4ade80', '#60a5fa', '#a78bfa', '#f472b6', '#2dd4bf'];
+const AVATAR_COLORS = [
+  "#ff6347",
+  "#f59e0b",
+  "#4ade80",
+  "#60a5fa",
+  "#a78bfa",
+  "#f472b6",
+  "#2dd4bf",
+];
 
 function avatarColor(name) {
   let h = 0;
@@ -19,7 +27,7 @@ function formatTime(totalSeconds) {
   const s = Math.max(0, Math.round(totalSeconds));
   const m = Math.floor(s / 60);
   const r = s % 60;
-  return `${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
 }
 
 function playBeep() {
@@ -32,7 +40,10 @@ function playBeep() {
       gain.connect(ctx.destination);
       osc.frequency.value = i === 2 ? 880 : 660;
       gain.gain.setValueAtTime(0.25, ctx.currentTime + delay);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.2);
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        ctx.currentTime + delay + 0.2,
+      );
       osc.start(ctx.currentTime + delay);
       osc.stop(ctx.currentTime + delay + 0.22);
     });
@@ -42,9 +53,9 @@ function playBeep() {
 }
 
 function notify(message) {
-  if (typeof Notification === 'undefined') return;
-  if (Notification.permission === 'granted') {
-    new Notification('🍅 Pomodoro Amigos', { body: message });
+  if (typeof Notification === "undefined") return;
+  if (Notification.permission === "granted") {
+    new Notification("🍅 shared pomodoro", { body: message });
   }
 }
 
@@ -77,12 +88,12 @@ function Stepper({ label, value, onChange, step = 5, min = 1, max = 180 }) {
 }
 
 export default function TimerPage() {
-  const [name, setName] = useState('');
+  const [name, setName] = useState("");
   const [nameLoaded, setNameLoaded] = useState(false);
   const [editingName, setEditingName] = useState(false);
-  const [draftName, setDraftName] = useState('');
+  const [draftName, setDraftName] = useState("");
 
-  const [mode, setMode] = useState('pomodoro'); // 'pomodoro' | 'timer'
+  const [mode, setMode] = useState("pomodoro"); // 'pomodoro' | 'timer'
 
   // Ajustes (en minutos)
   const [workMin, setWorkMin] = useState(25);
@@ -91,19 +102,19 @@ export default function TimerPage() {
   const [timerMin, setTimerMin] = useState(30);
 
   // Estado del temporizador
-  const [phase, setPhase] = useState('work'); // 'work' | 'break' | 'longBreak' (solo pomodoro)
+  const [phase, setPhase] = useState("work"); // 'work' | 'break' | 'longBreak' (solo pomodoro)
   const [running, setRunning] = useState(false);
   const [remaining, setRemaining] = useState(25 * 60); // segundos
   const [total, setTotal] = useState(25 * 60);
   const [completedPomodoros, setCompletedPomodoros] = useState(0);
-  const [saveError, setSaveError] = useState('');
+  const [saveError, setSaveError] = useState("");
 
   const endAtRef = useRef(null);
   const intervalRef = useRef(null);
 
   // Cargar nombre guardado
   useEffect(() => {
-    setName(localStorage.getItem('pomodoro-amigos-name') || '');
+    setName(localStorage.getItem("pomodoro-amigos-name") || "");
     setNameLoaded(true);
   }, []);
 
@@ -111,18 +122,18 @@ export default function TimerPage() {
     const clean = draftName.trim();
     if (!clean) return;
     setName(clean);
-    localStorage.setItem('pomodoro-amigos-name', clean);
+    localStorage.setItem("pomodoro-amigos-name", clean);
     setEditingName(false);
   };
 
   const durationForPhase = useCallback(
     (ph) => {
-      if (mode === 'timer') return timerMin * 60;
-      if (ph === 'work') return workMin * 60;
-      if (ph === 'longBreak') return longBreakMin * 60;
+      if (mode === "timer") return timerMin * 60;
+      if (ph === "work") return workMin * 60;
+      if (ph === "longBreak") return longBreakMin * 60;
       return breakMin * 60;
     },
-    [mode, timerMin, workMin, breakMin, longBreakMin]
+    [mode, timerMin, workMin, breakMin, longBreakMin],
   );
 
   // Si cambian los ajustes de duración con el temporizador parado, actualizar la cuenta.
@@ -138,10 +149,11 @@ export default function TimerPage() {
   // Título de la pestaña
   useEffect(() => {
     if (running) {
-      const label = mode === 'timer' ? 'Timer' : phase === 'work' ? 'Focus' : 'Descanso';
+      const label =
+        mode === "timer" ? "Timer" : phase === "work" ? "Focus" : "Descanso";
       document.title = `${formatTime(remaining)} · ${label}`;
     } else {
-      document.title = 'Pomodoro Amigos';
+      document.title = "shared pomodoro";
     }
   }, [remaining, running, mode, phase]);
 
@@ -149,11 +161,17 @@ export default function TimerPage() {
     setRunning(false);
     playBeep();
 
-    if (mode === 'timer') {
-      notify('¡Tiempo completado!');
-      setSaveError('');
-      saveSession({ name: name.trim(), mode: 'timer', minutes: timerMin }).catch(() =>
-        setSaveError('No se pudo guardar la sesión. Revisa tu conexión o la configuración de Supabase.')
+    if (mode === "timer") {
+      notify("¡Tiempo completado!");
+      setSaveError("");
+      saveSession({
+        name: name.trim(),
+        mode: "timer",
+        minutes: timerMin,
+      }).catch(() =>
+        setSaveError(
+          "No se pudo guardar la sesión. Revisa tu conexión o la configuración de Supabase.",
+        ),
       );
       const d = timerMin * 60;
       setRemaining(d);
@@ -161,31 +179,51 @@ export default function TimerPage() {
       return;
     }
 
-    if (phase === 'work') {
+    if (phase === "work") {
       const done = completedPomodoros + 1;
       setCompletedPomodoros(done);
-      setSaveError('');
-      saveSession({ name: name.trim(), mode: 'pomodoro', minutes: workMin }).catch(() =>
-        setSaveError('No se pudo guardar la sesión. Revisa tu conexión o la configuración de Supabase.')
+      setSaveError("");
+      saveSession({
+        name: name.trim(),
+        mode: "pomodoro",
+        minutes: workMin,
+      }).catch(() =>
+        setSaveError(
+          "No se pudo guardar la sesión. Revisa tu conexión o la configuración de Supabase.",
+        ),
       );
-      const nextPhase = done % CYCLES_BEFORE_LONG_BREAK === 0 ? 'longBreak' : 'break';
-      notify(nextPhase === 'longBreak' ? '¡Pomodoro completado! Descanso largo 🎉' : '¡Pomodoro completado! Toca descansar.');
+      const nextPhase =
+        done % CYCLES_BEFORE_LONG_BREAK === 0 ? "longBreak" : "break";
+      notify(
+        nextPhase === "longBreak"
+          ? "¡Pomodoro completado! Descanso largo 🎉"
+          : "¡Pomodoro completado! Toca descansar.",
+      );
       setPhase(nextPhase);
       // Los descansos empiezan solos
-      const d = nextPhase === 'longBreak' ? longBreakMin * 60 : breakMin * 60;
+      const d = nextPhase === "longBreak" ? longBreakMin * 60 : breakMin * 60;
       setRemaining(d);
       setTotal(d);
       endAtRef.current = Date.now() + d * 1000;
       setRunning(true);
     } else {
-      notify('Descanso terminado. ¡A por el siguiente pomodoro!');
-      setPhase('work');
+      notify("Descanso terminado. ¡A por el siguiente pomodoro!");
+      setPhase("work");
       const d = workMin * 60;
       setRemaining(d);
       setTotal(d);
       // El trabajo empieza cuando tú le des, sin prisa
     }
-  }, [mode, phase, name, timerMin, workMin, breakMin, longBreakMin, completedPomodoros]);
+  }, [
+    mode,
+    phase,
+    name,
+    timerMin,
+    workMin,
+    breakMin,
+    longBreakMin,
+    completedPomodoros,
+  ]);
 
   // Bucle del temporizador basado en timestamps (no se desincroniza si la pestaña se duerme)
   useEffect(() => {
@@ -208,7 +246,10 @@ export default function TimerPage() {
 
   const start = () => {
     if (!name.trim()) return;
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    if (
+      typeof Notification !== "undefined" &&
+      Notification.permission === "default"
+    ) {
       Notification.requestPermission();
     }
     endAtRef.current = Date.now() + remaining * 1000;
@@ -221,16 +262,16 @@ export default function TimerPage() {
 
   const reset = () => {
     setRunning(false);
-    setPhase('work');
-    const d = mode === 'timer' ? timerMin * 60 : workMin * 60;
+    setPhase("work");
+    const d = mode === "timer" ? timerMin * 60 : workMin * 60;
     setRemaining(d);
     setTotal(d);
   };
 
   const skipPhase = () => {
-    if (mode !== 'pomodoro' || phase === 'work') return;
+    if (mode !== "pomodoro" || phase === "work") return;
     setRunning(false);
-    setPhase('work');
+    setPhase("work");
     const d = workMin * 60;
     setRemaining(d);
     setTotal(d);
@@ -240,8 +281,8 @@ export default function TimerPage() {
     if (m === mode) return;
     setRunning(false);
     setMode(m);
-    setPhase('work');
-    const d = m === 'timer' ? timerMin * 60 : workMin * 60;
+    setPhase("work");
+    const d = m === "timer" ? timerMin * 60 : workMin * 60;
     setRemaining(d);
     setTotal(d);
   };
@@ -250,8 +291,8 @@ export default function TimerPage() {
   const R = 125;
   const C = 2 * Math.PI * R;
   const progress = total > 0 ? remaining / total : 0;
-  const isBreak = mode === 'pomodoro' && phase !== 'work';
-  const ringColor = isBreak ? 'var(--green)' : 'var(--accent)';
+  const isBreak = mode === "pomodoro" && phase !== "work";
+  const ringColor = isBreak ? "var(--green)" : "var(--accent)";
 
   const showWelcome = nameLoaded && (!name.trim() || editingName);
 
@@ -261,11 +302,11 @@ export default function TimerPage() {
         <div className="overlay">
           <div className="welcome-card">
             <div className="welcome-emoji">🍅</div>
-            <h2>{name.trim() ? 'Cambiar nombre' : '¡Bienvenido!'}</h2>
+            <h2>{name.trim() ? "Cambiar nombre" : "¡Bienvenido!"}</h2>
             <p>
               {name.trim()
-                ? 'Tus próximas sesiones se guardarán con el nuevo nombre.'
-                : 'Dinos cómo te llamas para guardar tus pomodoros y salir en el ranking con tus amigos.'}
+                ? "Tus próximas sesiones se guardarán con el nuevo nombre."
+                : "Dinos cómo te llamas para guardar tus pomodoros y salir en el ranking con tus amigos."}
             </p>
             <input
               autoFocus
@@ -274,11 +315,15 @@ export default function TimerPage() {
               maxLength={30}
               value={draftName}
               onChange={(e) => setDraftName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && saveName()}
+              onKeyDown={(e) => e.key === "Enter" && saveName()}
             />
             <div className="welcome-actions">
-              <button className="btn btn-primary" disabled={!draftName.trim()} onClick={saveName}>
-                {name.trim() ? 'Guardar' : '¡A concentrarse!'}
+              <button
+                className="btn btn-primary"
+                disabled={!draftName.trim()}
+                onClick={saveName}
+              >
+                {name.trim() ? "Guardar" : "¡A concentrarse!"}
               </button>
               {name.trim() && (
                 <button className="btn" onClick={() => setEditingName(false)}>
@@ -292,17 +337,24 @@ export default function TimerPage() {
 
       {!hasSupabase && (
         <div className="banner">
-          ℹ️ Supabase no está configurado: las sesiones se guardan solo en este navegador.
-          Sigue los pasos del README para tener estadísticas compartidas con tus amigos.
+          ℹ️ Supabase no está configurado: las sesiones se guardan solo en este
+          navegador. Sigue los pasos del README para tener estadísticas
+          compartidas con tus amigos.
         </div>
       )}
 
       <div className="top-row">
         <div className="mode-switch">
-          <button className={mode === 'pomodoro' ? 'active' : ''} onClick={() => switchMode('pomodoro')}>
+          <button
+            className={mode === "pomodoro" ? "active" : ""}
+            onClick={() => switchMode("pomodoro")}
+          >
             🍅 Pomodoro
           </button>
-          <button className={mode === 'timer' ? 'active' : ''} onClick={() => switchMode('timer')}>
+          <button
+            className={mode === "timer" ? "active" : ""}
+            onClick={() => switchMode("timer")}
+          >
             ⏱️ Temporizador
           </button>
         </div>
@@ -326,15 +378,28 @@ export default function TimerPage() {
       </div>
 
       <div className="card timer-card">
-        {mode === 'pomodoro' && (
-          <span className={`phase-label ${isBreak ? 'phase-break' : 'phase-work'}`}>
-            {phase === 'work' ? 'Concentración' : phase === 'longBreak' ? 'Descanso largo' : 'Descanso'}
+        {mode === "pomodoro" && (
+          <span
+            className={`phase-label ${isBreak ? "phase-break" : "phase-work"}`}
+          >
+            {phase === "work"
+              ? "Concentración"
+              : phase === "longBreak"
+                ? "Descanso largo"
+                : "Descanso"}
           </span>
         )}
 
         <div className="ring-wrap">
           <svg width="280" height="280" viewBox="0 0 280 280">
-            <circle className="ring-bg" cx="140" cy="140" r={R} fill="none" strokeWidth="10" />
+            <circle
+              className="ring-bg"
+              cx="140"
+              cy="140"
+              r={R}
+              fill="none"
+              strokeWidth="10"
+            />
             <circle
               className="ring-fg"
               cx="140"
@@ -349,9 +414,10 @@ export default function TimerPage() {
           </svg>
           <div className="ring-time">
             <span className="digits">{formatTime(remaining)}</span>
-            {mode === 'pomodoro' && (
+            {mode === "pomodoro" && (
               <span className="sub">
-                {completedPomodoros} pomodoro{completedPomodoros === 1 ? '' : 's'} hoy
+                {completedPomodoros} pomodoro
+                {completedPomodoros === 1 ? "" : "s"} hoy
               </span>
             )}
           </div>
@@ -359,8 +425,12 @@ export default function TimerPage() {
 
         <div className="controls">
           {!running ? (
-            <button className="btn btn-primary" onClick={start} disabled={!name.trim()}>
-              {remaining < total ? 'Continuar' : 'Empezar'}
+            <button
+              className="btn btn-primary"
+              onClick={start}
+              disabled={!name.trim()}
+            >
+              {remaining < total ? "Continuar" : "Empezar"}
             </button>
           ) : (
             <button className="btn" onClick={pause}>
@@ -370,7 +440,7 @@ export default function TimerPage() {
           <button className="btn" onClick={reset}>
             Reiniciar
           </button>
-          {mode === 'pomodoro' && isBreak && (
+          {mode === "pomodoro" && isBreak && (
             <button className="btn" onClick={skipPhase}>
               Saltar descanso
             </button>
@@ -381,13 +451,13 @@ export default function TimerPage() {
 
         {!running && (
           <>
-            {mode === 'timer' && (
+            {mode === "timer" && (
               <div className="preset-chips">
                 {TIMER_PRESETS.map((p) => (
                   <button
                     key={p}
                     type="button"
-                    className={`chip ${timerMin === p ? 'active' : ''}`}
+                    className={`chip ${timerMin === p ? "active" : ""}`}
                     onClick={() => setTimerMin(p)}
                   >
                     {p} min
@@ -397,21 +467,46 @@ export default function TimerPage() {
             )}
 
             <div className="settings">
-              {mode === 'pomodoro' ? (
+              {mode === "pomodoro" ? (
                 <>
-                  <Stepper label="Trabajo" value={workMin} onChange={setWorkMin} step={5} min={5} />
-                  <Stepper label="Descanso" value={breakMin} onChange={setBreakMin} step={1} />
-                  <Stepper label="Descanso largo" value={longBreakMin} onChange={setLongBreakMin} step={5} min={5} />
+                  <Stepper
+                    label="Trabajo"
+                    value={workMin}
+                    onChange={setWorkMin}
+                    step={5}
+                    min={5}
+                  />
+                  <Stepper
+                    label="Descanso"
+                    value={breakMin}
+                    onChange={setBreakMin}
+                    step={1}
+                  />
+                  <Stepper
+                    label="Descanso largo"
+                    value={longBreakMin}
+                    onChange={setLongBreakMin}
+                    step={5}
+                    min={5}
+                  />
                 </>
               ) : (
-                <Stepper label="Personalizado" value={timerMin} onChange={setTimerMin} step={5} min={5} />
+                <Stepper
+                  label="Personalizado"
+                  value={timerMin}
+                  onChange={setTimerMin}
+                  step={5}
+                  min={5}
+                />
               )}
             </div>
           </>
         )}
 
-        {mode === 'pomodoro' && (
-          <p className="cycles-info">Cada {CYCLES_BEFORE_LONG_BREAK} pomodoros toca un descanso largo.</p>
+        {mode === "pomodoro" && (
+          <p className="cycles-info">
+            Cada {CYCLES_BEFORE_LONG_BREAK} pomodoros toca un descanso largo.
+          </p>
         )}
       </div>
     </div>

@@ -1,9 +1,9 @@
-import './globals.css';
-import Link from 'next/link';
+import "./globals.css";
+import Link from "next/link";
 
 export const metadata = {
-  title: 'Pomodoro Amigos',
-  description: 'Pomodoro compartido con estadísticas para ti y tus amigos',
+  title: "shared pomodoro",
+  description: "Pomodoro compartido con estadísticas para ti y tus amigos",
 };
 
 export default function RootLayout({ children }) {
@@ -12,7 +12,7 @@ export default function RootLayout({ children }) {
       <body>
         <header className="site-header">
           <Link href="/" className="logo">
-            🍅 <span>Pomodoro Amigos</span>
+            🍅 <span>shared pomodoro</span>
           </Link>
           <nav>
             <Link href="/">Temporizador</Link>
