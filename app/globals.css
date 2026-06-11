@@ -504,6 +504,22 @@ a {
   font-size: 0.9rem;
 }
 
+.finish-info {
+  color: var(--text-dim);
+  font-size: 0.95rem;
+}
+
+.finish-info strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-done {
+  color: var(--green);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
 .banner {
   background: var(--bg-card);
   border: 1px solid var(--border);

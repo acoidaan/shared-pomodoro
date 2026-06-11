@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -85,13 +86,16 @@ export function TimerProvider({ children }) {
   const [breakMin, setBreakMin] = useState(5);
   const [longBreakMin, setLongBreakMin] = useState(15);
   const [timerMin, setTimerMin] = useState(30);
+  const [cycles, setCycles] = useState(1); // ciclos del plan (1 ciclo = 4 pomodoros + descanso largo)
 
   // Estado del temporizador
   const [phase, setPhase] = useState("work"); // 'work' | 'break' | 'longBreak' (solo pomodoro)
   const [running, setRunning] = useState(false);
   const [remaining, setRemaining] = useState(25 * 60); // segundos
   const [total, setTotal] = useState(25 * 60);
-  const [completedPomodoros, setCompletedPomodoros] = useState(0);
+  const [completedPomodoros, setCompletedPomodoros] = useState(0); // total de la jornada
+  const [planPos, setPlanPos] = useState(0); // pomodoros completados del plan actual
+  const [planDone, setPlanDone] = useState(false);
   const [saveError, setSaveError] = useState("");
 
   // Sala en tiempo real (Supabase Presence)
@@ -102,10 +106,24 @@ export function TimerProvider({ children }) {
   const endAtRef = useRef(null);
   const intervalRef = useRef(null);
 
+  const totalPlanPomodoros = cycles * CYCLES_BEFORE_LONG_BREAK;
+
   // Cargar nombre guardado
   useEffect(() => {
     setNameState(localStorage.getItem("pomodoro-amigos-name") || "");
     setNameLoaded(true);
+  }, []);
+
+  // Atajo SOLO de desarrollo para probar el encadenado de fases sin esperar:
+  // window.__ffPhase() adelanta la fase actual a 2 segundos del final.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    window.__ffPhase = () => {
+      if (endAtRef.current) endAtRef.current = Date.now() + 2000;
+    };
+    return () => {
+      delete window.__ffPhase;
+    };
   }, []);
 
   const setName = useCallback((newName) => {
@@ -143,6 +161,36 @@ export function TimerProvider({ children }) {
       document.title = "shared pomodoro";
     }
   }, [remaining, running, mode, phase]);
+
+  // Segundos que quedan para terminar TODO el plan (fase actual incluida).
+  // Simula las fases que faltan: trabajos, descansos y el descanso largo final.
+  const planRemainingSeconds = useMemo(() => {
+    if (mode === "timer") return remaining;
+    let secs = remaining;
+    let pos = planPos;
+    let ph = phase;
+    for (let guard = 0; guard < 200; guard++) {
+      if (ph === "work") {
+        pos += 1;
+        ph = pos % CYCLES_BEFORE_LONG_BREAK === 0 ? "longBreak" : "break";
+        secs += (ph === "longBreak" ? longBreakMin : breakMin) * 60;
+      } else {
+        if (pos >= totalPlanPomodoros) break; // descanso largo final terminado
+        ph = "work";
+        secs += workMin * 60;
+      }
+    }
+    return secs;
+  }, [
+    mode,
+    remaining,
+    planPos,
+    phase,
+    workMin,
+    breakMin,
+    longBreakMin,
+    totalPlanPomodoros,
+  ]);
 
   // ---- Sala en tiempo real -------------------------------------------------
   // Cada cliente entra a un canal de presencia con su nombre como clave y
@@ -215,8 +263,9 @@ export function TimerProvider({ children }) {
     }
 
     if (phase === "work") {
-      const done = completedPomodoros + 1;
-      setCompletedPomodoros(done);
+      const pos = planPos + 1;
+      setCompletedPomodoros(completedPomodoros + 1);
+      setPlanPos(pos);
       setSaveError("");
       saveSession({
         name: name.trim(),
@@ -228,7 +277,7 @@ export function TimerProvider({ children }) {
         ),
       );
       const nextPhase =
-        done % CYCLES_BEFORE_LONG_BREAK === 0 ? "longBreak" : "break";
+        pos % CYCLES_BEFORE_LONG_BREAK === 0 ? "longBreak" : "break";
       notify(
         nextPhase === "longBreak"
           ? "¡Pomodoro completado! Descanso largo 🎉"
@@ -241,13 +290,24 @@ export function TimerProvider({ children }) {
       setTotal(d);
       endAtRef.current = Date.now() + d * 1000;
       setRunning(true);
+    } else if (planPos >= totalPlanPomodoros) {
+      // Descanso largo del último ciclo terminado: plan completo
+      notify("🎉 ¡Plan completado! Buen trabajo.");
+      setPlanDone(true);
+      setPlanPos(0);
+      setPhase("work");
+      const d = workMin * 60;
+      setRemaining(d);
+      setTotal(d);
     } else {
+      // Fin de descanso: el siguiente pomodoro empieza solo
       notify("Descanso terminado. ¡A por el siguiente pomodoro!");
       setPhase("work");
       const d = workMin * 60;
       setRemaining(d);
       setTotal(d);
-      // El trabajo empieza cuando tú le des, sin prisa
+      endAtRef.current = Date.now() + d * 1000;
+      setRunning(true);
     }
   }, [
     mode,
@@ -259,6 +319,8 @@ export function TimerProvider({ children }) {
     breakMin,
     longBreakMin,
     completedPomodoros,
+    planPos,
+    totalPlanPomodoros,
   ]);
 
   // Bucle del temporizador basado en timestamps (no se desincroniza si la pestaña se duerme)
@@ -289,6 +351,7 @@ export function TimerProvider({ children }) {
     ) {
       Notification.requestPermission();
     }
+    setPlanDone(false);
     endAtRef.current = Date.now() + remaining * 1000;
     setRunning(true);
   }, [name, remaining]);
@@ -300,6 +363,8 @@ export function TimerProvider({ children }) {
   const reset = useCallback(() => {
     setRunning(false);
     setPhase("work");
+    setPlanPos(0);
+    setPlanDone(false);
     const d = mode === "timer" ? timerMin * 60 : workMin * 60;
     setRemaining(d);
     setTotal(d);
@@ -307,12 +372,24 @@ export function TimerProvider({ children }) {
 
   const skipPhase = useCallback(() => {
     if (mode !== "pomodoro" || phase === "work") return;
-    setRunning(false);
+    if (planPos >= totalPlanPomodoros) {
+      // Saltar el descanso largo final = dar el plan por terminado
+      setRunning(false);
+      setPlanDone(true);
+      setPlanPos(0);
+      setPhase("work");
+      const d = workMin * 60;
+      setRemaining(d);
+      setTotal(d);
+      return;
+    }
     setPhase("work");
     const d = workMin * 60;
     setRemaining(d);
     setTotal(d);
-  }, [mode, phase, workMin]);
+    endAtRef.current = Date.now() + d * 1000;
+    setRunning(true);
+  }, [mode, phase, workMin, planPos, totalPlanPomodoros]);
 
   const switchMode = useCallback(
     (m) => {
@@ -320,6 +397,8 @@ export function TimerProvider({ children }) {
       setRunning(false);
       setMode(m);
       setPhase("work");
+      setPlanPos(0);
+      setPlanDone(false);
       const d = m === "timer" ? timerMin * 60 : workMin * 60;
       setRemaining(d);
       setTotal(d);
@@ -333,6 +412,7 @@ export function TimerProvider({ children }) {
     unlockAudio();
     setMode(friend.mode);
     setPhase(friend.mode === "timer" ? "work" : friend.phase);
+    setPlanDone(false);
     setTotal(friend.total);
     setRemaining((friend.endAt - Date.now()) / 1000);
     endAtRef.current = friend.endAt;
@@ -352,11 +432,17 @@ export function TimerProvider({ children }) {
     setLongBreakMin,
     timerMin,
     setTimerMin,
+    cycles,
+    setCycles,
     phase,
     running,
     remaining,
     total,
     completedPomodoros,
+    planPos,
+    planDone,
+    totalPlanPomodoros,
+    planRemainingSeconds,
     saveError,
     friends,
     start,

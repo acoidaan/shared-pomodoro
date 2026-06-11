@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { hasSupabase } from "../lib/supabaseClient";
 import { avatarColor } from "../lib/avatar";
 import FriendsPanel from "./friends-panel";
@@ -12,25 +12,33 @@ import {
 
 const TIMER_PRESETS = [10, 15, 25, 30, 45, 60, 90];
 
-function Stepper({ label, value, onChange, step = 5, min = 1, max = 180 }) {
+function Stepper({
+  label,
+  value,
+  onChange,
+  step = 5,
+  min = 1,
+  max = 180,
+  unit = "min",
+}) {
   return (
     <div className="stepper-card">
       <span className="stepper-label">{label}</span>
       <div className="stepper">
         <button
           type="button"
-          aria-label={`Restar ${step} minutos a ${label}`}
+          aria-label={`Restar ${step} a ${label}`}
           onClick={() => onChange(Math.max(min, value - step))}
         >
           −
         </button>
         <span className="stepper-value">
           {value}
-          <small>min</small>
+          <small>{unit}</small>
         </span>
         <button
           type="button"
-          aria-label={`Sumar ${step} minutos a ${label}`}
+          aria-label={`Sumar ${step} a ${label}`}
           onClick={() => onChange(Math.min(max, value + step))}
         >
           +
@@ -54,11 +62,17 @@ export default function TimerPage() {
     setLongBreakMin,
     timerMin,
     setTimerMin,
+    cycles,
+    setCycles,
     phase,
     running,
     remaining,
     total,
     completedPomodoros,
+    planPos,
+    planDone,
+    totalPlanPomodoros,
+    planRemainingSeconds,
     saveError,
     start,
     pause,
@@ -69,6 +83,23 @@ export default function TimerPage() {
 
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState("");
+
+  // Con el reloj parado, refrescar la hora estimada de fin cada 30 s
+  const [, refreshEstimate] = useReducer((x) => x + 1, 0);
+  useEffect(() => {
+    if (running) return;
+    const id = setInterval(refreshEstimate, 30000);
+    return () => clearInterval(id);
+  }, [running]);
+
+  const finishAt = new Date(
+    Date.now() + planRemainingSeconds * 1000,
+  ).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+
+  const currentPom = Math.min(
+    planPos + (phase === "work" ? 1 : 0),
+    totalPlanPomodoros,
+  );
 
   const saveName = () => {
     const clean = draftName.trim();
@@ -206,8 +237,8 @@ export default function TimerPage() {
             <span className="digits">{formatTime(remaining)}</span>
             {mode === "pomodoro" && (
               <span className="sub">
-                {completedPomodoros} pomodoro
-                {completedPomodoros === 1 ? "" : "s"} hoy
+                Pomodoro {currentPom} de {totalPlanPomodoros} ·{" "}
+                {completedPomodoros} hoy
               </span>
             )}
           </div>
@@ -236,6 +267,15 @@ export default function TimerPage() {
             </button>
           )}
         </div>
+
+        {planDone && <p className="plan-done">¡Plan completado!</p>}
+
+        {!planDone && (
+          <p className="finish-info">
+            {running ? "Acabarás" : "Acabarías"} a las{" "}
+            <strong>{finishAt}</strong>
+          </p>
+        )}
 
         {saveError && <p className="cycles-info">⚠️ {saveError}</p>}
 
@@ -279,6 +319,15 @@ export default function TimerPage() {
                     step={5}
                     min={5}
                   />
+                  <Stepper
+                    label="Ciclos"
+                    value={cycles}
+                    onChange={setCycles}
+                    step={1}
+                    min={1}
+                    max={8}
+                    unit={cycles === 1 ? "ciclo" : "ciclos"}
+                  />
                 </>
               ) : (
                 <Stepper
@@ -295,7 +344,8 @@ export default function TimerPage() {
 
         {mode === "pomodoro" && (
           <p className="cycles-info">
-            Cada {CYCLES_BEFORE_LONG_BREAK} pomodoros toca un descanso largo.
+            1 ciclo = {CYCLES_BEFORE_LONG_BREAK} pomodoros con sus descansos +
+            descanso largo final.
           </p>
         )}
       </div>
