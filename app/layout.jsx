@@ -4,7 +4,7 @@ import { TimerProvider } from "./timer-context";
 import HeaderTimer from "./header-timer";
 
 export const metadata = {
-  title: "shared pomodoro",
+  title: "🍅 shared pomodoro",
   description: "Pomodoro compartido con estadísticas para ti y tus amigos",
 };
 
