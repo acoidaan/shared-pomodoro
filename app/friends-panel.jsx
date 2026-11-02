@@ -8,17 +8,18 @@ import { formatTime, useTimer } from "./timer-context";
 function statusFor(friend, now) {
   if (friend.running && friend.endAt) {
     const left = (friend.endAt - now) / 1000;
-    if (left <= 0) return { icon: "⏳", label: "Terminando…", left: null };
-    if (friend.mode === "timer")
-      return { icon: "⏱️", label: "Temporizador", left };
-    if (friend.phase === "work")
-      return { icon: "🍅", label: "Concentrado", left };
-    return { icon: "☕", label: "Descansando", left };
+    if (left <= 0) return { label: "Terminando…", left: null, kind: "ending" };
+    if (friend.mode === "timer") {
+      return { label: "Temporizador", left, kind: "timer" };
+    }
+    if (friend.phase === "work") {
+      return { label: "En concentración", left, kind: "focus" };
+    }
+    return { label: "En descanso", left, kind: "break" };
   }
-  return { icon: "👀", label: "Conectado", left: null };
+  return { label: "Disponible", left: null, kind: "online" };
 }
 
-// Quién tiene la página abierta ahora mismo, vía Supabase Realtime Presence.
 export default function FriendsPanel() {
   const { friends, name, joinSession } = useTimer();
   const [now, setNow] = useState(() => Date.now());
@@ -39,55 +40,91 @@ export default function FriendsPanel() {
   });
 
   return (
-    <div className="card friends-panel">
-      <h2 className="friends-title">
-        👥 En la sala ahora <span className="friends-count">{friends.length}</span>
-      </h2>
-      <div className="friends-list">
-        {sorted.map((f) => {
-          const isMe = f.key === me;
-          const st = statusFor(f, now);
+    <section className="card friends-panel">
+      <div className="friends-panel-head">
+        <div>
+          <span className="eyebrow">Sala en directo</span>
+          <h2 className="friends-title">
+            Personas conectadas
+            <span className="friends-count">{friends.length}</span>
+          </h2>
+        </div>
+        <div className="room-avatars" aria-hidden="true">
+          {sorted.slice(0, 5).map((friend) => (
+            <span
+              key={friend.key}
+              style={{ background: avatarColor(friend.key) }}
+            >
+              {friend.key.charAt(0).toUpperCase()}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="friends-grid">
+        {sorted.map((friend) => {
+          const isMe = friend.key === me;
+          const status = statusFor(friend, now);
           const joinable =
-            !isMe && f.running && f.endAt && f.endAt - now > 5000;
+            !isMe && friend.running && friend.endAt && friend.endAt - now > 5000;
+          const sharedTasks = Array.isArray(friend.tasks)
+            ? friend.tasks.slice(0, 12)
+            : [];
+          const color = avatarColor(friend.key);
+
           return (
-            <div className="friend-row" key={f.key}>
-              <span
-                className="avatar"
-                style={{ background: avatarColor(f.key) }}
-              >
-                {f.key.charAt(0).toUpperCase()}
-              </span>
-              <span className="friend-name">
-                {f.key}
-                {isMe && <small> (tú)</small>}
-              </span>
-              <span
-                className={`friend-status ${st.left != null && f.phase === "work" && f.mode === "pomodoro" ? "focusing" : ""}`}
-              >
-                {st.icon} {st.label}
-                {st.left != null && (
-                  <strong className="friend-countdown">
-                    {formatTime(st.left)}
-                  </strong>
+            <article
+              className="friend-card"
+              key={friend.key}
+              style={{ "--user-color": color }}
+            >
+              <div className="friend-row">
+                <span className="avatar" style={{ background: color }}>
+                  {friend.key.charAt(0).toUpperCase()}
+                </span>
+                <span className="friend-name">
+                  {friend.key}
+                  {isMe && <small>Tú</small>}
+                </span>
+                <span className={`friend-status ${status.kind}`}>
+                  <span className="friend-status-dot" />
+                  {status.label}
+                  {status.left != null && (
+                    <strong className="friend-countdown">
+                      {formatTime(status.left)}
+                    </strong>
+                  )}
+                </span>
+                {joinable && (
+                  <button
+                    className="btn join-btn"
+                    title={`Unirte a la sesión de ${friend.key}`}
+                    onClick={() => joinSession(friend)}
+                  >
+                    Unirme
+                  </button>
                 )}
-              </span>
-              {joinable && (
-                <button
-                  className="btn join-btn"
-                  title="Sincronizar tu temporizador con esta sesión"
-                  onClick={() => joinSession(f)}
-                >
-                  Unirme
-                </button>
-              )}
-            </div>
+              </div>
+
+              <div className="shared-focus-list">
+                <span className="shared-focus-title">Lista de enfoque</span>
+                {sharedTasks.length > 0 ? (
+                  <ul>
+                    {sharedTasks.map((task) => (
+                      <li key={task.id} className={task.done ? "done" : ""}>
+                        <span>{task.done ? "✓" : ""}</span>
+                        {task.text}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>Aún no ha compartido ninguna tarea.</p>
+                )}
+              </div>
+            </article>
           );
         })}
       </div>
-      <p className="friends-hint">
-        Pulsa «Unirme» para engancharte al reloj de un amigo y terminar a la
-        vez.
-      </p>
-    </div>
+    </section>
   );
 }

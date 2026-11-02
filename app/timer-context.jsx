@@ -97,6 +97,7 @@ export function TimerProvider({ children }) {
   const [planPos, setPlanPos] = useState(0); // pomodoros completados del plan actual
   const [planDone, setPlanDone] = useState(false);
   const [saveError, setSaveError] = useState("");
+  const [tasks, setTasks] = useState([]);
 
   // Sala en tiempo real (Supabase Presence)
   const [friends, setFriends] = useState([]);
@@ -111,6 +112,14 @@ export function TimerProvider({ children }) {
   // Cargar nombre guardado
   useEffect(() => {
     setNameState(localStorage.getItem("pomodoro-amigos-name") || "");
+    try {
+      const savedTasks = JSON.parse(
+        localStorage.getItem("shared-pomodoro-focus-tasks") || "[]",
+      );
+      setTasks(Array.isArray(savedTasks) ? savedTasks.slice(0, 12) : []);
+    } catch {
+      setTasks([]);
+    }
     setNameLoaded(true);
   }, []);
 
@@ -130,6 +139,54 @@ export function TimerProvider({ children }) {
     setNameState(newName);
     localStorage.setItem("pomodoro-amigos-name", newName);
   }, []);
+
+  const updateTasks = useCallback((updater) => {
+    setTasks((current) => {
+      const next = updater(current).slice(0, 12);
+      localStorage.setItem(
+        "shared-pomodoro-focus-tasks",
+        JSON.stringify(next),
+      );
+      return next;
+    });
+  }, []);
+
+  const addTask = useCallback(
+    (text) => {
+      const clean = text.trim();
+      if (!clean) return;
+      updateTasks((current) => [
+        ...current,
+        {
+          id:
+            typeof crypto !== "undefined" && crypto.randomUUID
+              ? crypto.randomUUID()
+              : `${Date.now()}-${Math.random()}`,
+          text: clean.slice(0, 100),
+          done: false,
+        },
+      ]);
+    },
+    [updateTasks],
+  );
+
+  const toggleTask = useCallback(
+    (taskId) => {
+      updateTasks((current) =>
+        current.map((task) =>
+          task.id === taskId ? { ...task, done: !task.done } : task,
+        ),
+      );
+    },
+    [updateTasks],
+  );
+
+  const removeTask = useCallback(
+    (taskId) => {
+      updateTasks((current) => current.filter((task) => task.id !== taskId));
+    },
+    [updateTasks],
+  );
 
   const durationForPhase = useCallback(
     (ph) => {
@@ -232,9 +289,10 @@ export function TimerProvider({ children }) {
       running,
       endAt: running ? endAtRef.current : null,
       total,
+      tasks,
       updatedAt: Date.now(),
     });
-  }, [presenceReady, running, phase, mode, total]);
+  }, [presenceReady, running, phase, mode, total, tasks]);
 
   const handleComplete = useCallback(() => {
     setRunning(false);
@@ -445,6 +503,10 @@ export function TimerProvider({ children }) {
     planRemainingSeconds,
     saveError,
     friends,
+    tasks,
+    addTask,
+    toggleTask,
+    removeTask,
     start,
     pause,
     reset,
