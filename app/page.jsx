@@ -111,7 +111,7 @@ export default function TimerPage() {
     switchMode,
   } = useTimer();
   const roomSession = useRoom();
-  const controlsLocked = Boolean(roomSession && !roomSession.isHost);
+  const controlsLocked = Boolean(roomSession && !roomSession.canControl);
 
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -214,9 +214,7 @@ export default function TimerPage() {
           </h1>
           <p>
             {roomSession
-              ? roomSession.isHost
-                ? "Tú marcas el ritmo; el temporizador se sincroniza para toda la sala."
-                : "El anfitrión controla el reloj. Tu lista de enfoque sigue siendo solo tuya para editar."
+              ? "Cualquier participante puede iniciar, pausar o ajustar el reloj compartido."
               : "Define tu ritmo, elimina distracciones y avanza en lo que importa."}
           </p>
         </div>

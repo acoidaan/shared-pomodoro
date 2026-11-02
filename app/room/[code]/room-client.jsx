@@ -39,7 +39,7 @@ function RoomContent() {
     );
   }
 
-  if (["missing", "error"].includes(roomSession.status)) {
+  if (["missing", "expired", "error"].includes(roomSession.status)) {
     return (
       <div className="room-gate card">
         <span className="room-gate-mark error">!</span>

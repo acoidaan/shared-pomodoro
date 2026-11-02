@@ -45,8 +45,10 @@ export default function ObsOverlay({ code }) {
           code,
           (nextRoom) => {
             if (!active) return;
-            setRoom(nextRoom);
-            setStatus(nextRoom ? "ready" : "missing");
+            const expired =
+              nextRoom?.expiresAt && Number(nextRoom.expiresAt) <= Date.now();
+            setRoom(expired ? null : nextRoom);
+            setStatus(nextRoom && !expired ? "ready" : "missing");
           },
           () => active && setStatus("error"),
         );
@@ -107,7 +109,7 @@ export default function ObsOverlay({ code }) {
         <span className="obs-phase">{phaseLabel(timer)}</span>
         <strong className="obs-time">{formatTime(remaining)}</strong>
         <span className="obs-state">
-          {timer?.running ? "Sesión en curso" : "Esperando al anfitrión"}
+          {timer?.running ? "Sesión en curso" : "Listos para empezar"}
         </span>
       </section>
 

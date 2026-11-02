@@ -129,6 +129,8 @@ export function RoomToolbar() {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
 
   if (!roomSession || roomSession.status !== "ready") return null;
 
@@ -151,6 +153,22 @@ export function RoomToolbar() {
     }
   };
 
+  const close = async () => {
+    if (!confirmClose) {
+      setConfirmClose(true);
+      window.setTimeout(() => setConfirmClose(false), 4000);
+      return;
+    }
+
+    setClosing(true);
+    try {
+      await roomSession.closeRoom();
+      router.push("/");
+    } finally {
+      setClosing(false);
+    }
+  };
+
   return (
     <section className="room-toolbar">
       <div className="room-identity">
@@ -162,7 +180,7 @@ export function RoomToolbar() {
       </div>
       <div className="room-toolbar-meta">
         <span className="room-role">
-          {roomSession.isHost ? "Anfitrión" : "Participante"}
+          {roomSession.isHost ? "Creador" : "Participante"} · control compartido
         </span>
         <span className="room-code">{roomSession.code}</span>
         <span className="room-member-count">
@@ -183,6 +201,20 @@ export function RoomToolbar() {
         <button type="button" className="btn" onClick={copy}>
           {copied ? "Enlace copiado" : "Copiar invitación"}
         </button>
+        {roomSession.isHost && (
+          <button
+            type="button"
+            className={`btn btn-ghost room-close-btn ${confirmClose ? "confirm" : ""}`}
+            disabled={closing}
+            onClick={close}
+          >
+            {closing
+              ? "Cerrando…"
+              : confirmClose
+                ? "Confirmar cierre"
+                : "Cerrar sala"}
+          </button>
+        )}
         <button
           type="button"
           className="btn btn-ghost"

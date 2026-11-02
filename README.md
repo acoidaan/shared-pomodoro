@@ -99,10 +99,12 @@ Reinicia `npm run dev` después de crear `.env.local`.
 - El anfitrión pulsa **Crear sala**.
 - Se genera un código corto y una URL como `/room/ABC123`.
 - Los invitados entran mediante el enlace o escribiendo el código.
-- El anfitrión controla el temporizador.
+- Cualquier participante puede iniciar, pausar y ajustar el temporizador.
 - Todos reciben el mismo estado y la misma hora de finalización.
 - Cada participante conserva su color pastel y solo edita su propia lista.
 - Las listas de enfoque se muestran al resto en tiempo real.
+- Las salas caducan después de siete días sin actividad del temporizador compartido.
+- El anfitrión puede cerrarlas manualmente y borrar sus datos compartidos.
 
 ## Historial y estadísticas
 
@@ -142,6 +144,7 @@ un nuevo despliegue automático.
 
 ## Próximos pasos
 
-- Recuperación del control cuando el anfitrión se desconecta.
+- Transferencia de propiedad para cerrar una sala si su creador desaparece.
+- Limpieza administrativa de salas caducadas que nunca vuelvan a abrirse.
 - Invitaciones directas y perfiles opcionales.
 - Variantes compacta y vertical de la overlay para OBS.

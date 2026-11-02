@@ -11,6 +11,7 @@ import {
 } from "react";
 import { hasFirebase } from "../lib/firebaseClient";
 import {
+  closeRoom as closeRoomData,
   joinRoom,
   removeRoomMember,
   subscribeToMembers,
@@ -21,6 +22,24 @@ import {
 import { useTimer } from "./timer-context";
 
 const RoomContext = createContext(null);
+
+function timerSignature(timer) {
+  if (!timer) return "";
+  return JSON.stringify([
+    timer.mode,
+    timer.phase,
+    Boolean(timer.running),
+    Math.round(Number(timer.total) || 0),
+    timer.running ? null : Math.round(Number(timer.remaining) || 0),
+    Number(timer.workMin),
+    Number(timer.breakMin),
+    Number(timer.longBreakMin),
+    Number(timer.timerMin),
+    Number(timer.cycles),
+    Number(timer.planPos),
+    Boolean(timer.planDone),
+  ]);
+}
 
 export function useRoom() {
   return useContext(RoomContext);
@@ -35,6 +54,7 @@ export function RoomProvider({ code, children }) {
   const [status, setStatus] = useState(hasFirebase ? "connecting" : "setup");
   const [error, setError] = useState("");
   const hydratedRef = useRef(false);
+  const remoteTimerSignatureRef = useRef("");
   const profileReady = timer.nameLoaded && Boolean(timer.name.trim());
 
   useEffect(() => {
@@ -64,9 +84,20 @@ export function RoomProvider({ code, children }) {
               return;
             }
 
+            if (
+              nextRoom.expiresAt &&
+              Number(nextRoom.expiresAt) <= Date.now()
+            ) {
+              setRoom(nextRoom);
+              setStatus("expired");
+              setError("Esta sala ha caducado después de siete días sin actividad.");
+              return;
+            }
+
             setRoom(nextRoom);
-            const isHost = nextRoom.hostId === joined.user.uid;
-            if (nextRoom.timer && (!hydratedRef.current || !isHost)) {
+            const updatedByMe = nextRoom.timerUpdatedBy === joined.user.uid;
+            if (nextRoom.timer && (!hydratedRef.current || !updatedByMe)) {
+              remoteTimerSignatureRef.current = timerSignature(nextRoom.timer);
               timer.syncSharedState(nextRoom.timer);
             }
             hydratedRef.current = true;
@@ -87,7 +118,13 @@ export function RoomProvider({ code, children }) {
       })
       .catch((joinError) => {
         if (!active) return;
-        setStatus(joinError.code === "ROOM_NOT_FOUND" ? "missing" : "error");
+        setStatus(
+          joinError.code === "ROOM_NOT_FOUND"
+            ? "missing"
+            : joinError.code === "ROOM_EXPIRED"
+              ? "expired"
+              : "error",
+        );
         setError(joinError.message || "No se pudo entrar en la sala.");
       });
 
@@ -166,26 +203,30 @@ export function RoomProvider({ code, children }) {
   }, [code, status, timer.setSessionContext]);
 
   useEffect(() => {
-    if (!isHost || !hydratedRef.current || status !== "ready") return;
+    if (!user || !hydratedRef.current || status !== "ready") return;
+
+    const sharedTimer = {
+      mode: timer.mode,
+      phase: timer.phase,
+      running: timer.running,
+      endsAt: timer.running ? Date.now() + timer.remaining * 1000 : null,
+      remaining: timer.remaining,
+      total: timer.total,
+      workMin: timer.workMin,
+      breakMin: timer.breakMin,
+      longBreakMin: timer.longBreakMin,
+      timerMin: timer.timerMin,
+      cycles: timer.cycles,
+      planPos: timer.planPos,
+      planDone: timer.planDone,
+    };
+    if (timerSignature(sharedTimer) === remoteTimerSignatureRef.current) return;
 
     const timeout = window.setTimeout(() => {
       updateRoomTimer({
         code,
-        timer: {
-          mode: timer.mode,
-          phase: timer.phase,
-          running: timer.running,
-          endsAt: timer.running ? Date.now() + timer.remaining * 1000 : null,
-          remaining: timer.remaining,
-          total: timer.total,
-          workMin: timer.workMin,
-          breakMin: timer.breakMin,
-          longBreakMin: timer.longBreakMin,
-          timerMin: timer.timerMin,
-          cycles: timer.cycles,
-          planPos: timer.planPos,
-          planDone: timer.planDone,
-        },
+        updatedBy: user.uid,
+        timer: sharedTimer,
       }).catch(() => setError("No se pudo sincronizar el temporizador."));
     }, 120);
 
@@ -194,7 +235,7 @@ export function RoomProvider({ code, children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     code,
-    isHost,
+    user,
     status,
     timer.mode,
     timer.phase,
@@ -213,6 +254,12 @@ export function RoomProvider({ code, children }) {
     if (user) await removeRoomMember({ code, user });
   }, [code, user]);
 
+  const closeRoom = useCallback(async () => {
+    if (!isHost) return;
+    await closeRoomData({ code });
+    setStatus("missing");
+  }, [code, isHost]);
+
   const copyInvite = useCallback(async () => {
     const url = `${window.location.origin}/room/${code}`;
     await navigator.clipboard.writeText(url);
@@ -229,8 +276,10 @@ export function RoomProvider({ code, children }) {
       status,
       error,
       isHost,
+      canControl: status === "ready" && Boolean(user),
       copyInvite,
       leaveRoom,
+      closeRoom,
     }),
     [
       code,
@@ -243,6 +292,7 @@ export function RoomProvider({ code, children }) {
       isHost,
       copyInvite,
       leaveRoom,
+      closeRoom,
     ],
   );
 

@@ -40,21 +40,52 @@ function playChime() {
   try {
     unlockAudio();
     if (!audioCtx) return;
-    // Pequeño arpegio C5 - E5 - G5
-    const notes = [523.25, 659.25, 783.99];
-    notes.forEach((freq, i) => {
-      const t = audioCtx.currentTime + i * 0.18;
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = "triangle";
-      osc.frequency.value = freq;
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(0.35, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
-      osc.start(t);
-      osc.stop(t + 0.5);
+
+    const now = audioCtx.currentTime;
+    const master = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(1800, now);
+    filter.Q.setValueAtTime(0.7, now);
+    master.gain.setValueAtTime(0.72, now);
+    filter.connect(master);
+    master.connect(audioCtx.destination);
+
+    // Tres campanas suaves y cálidas, con espacio entre ellas y cola larga.
+    const notes = [
+      { frequency: 392, delay: 0, volume: 0.11 },
+      { frequency: 523.25, delay: 0.34, volume: 0.09 },
+      { frequency: 659.25, delay: 0.72, volume: 0.075 },
+    ];
+
+    notes.forEach(({ frequency, delay, volume }) => {
+      const startAt = now + delay;
+      const stopAt = startAt + 2.1;
+      const bellGain = audioCtx.createGain();
+      bellGain.gain.setValueAtTime(0.0001, startAt);
+      bellGain.gain.exponentialRampToValueAtTime(volume, startAt + 0.045);
+      bellGain.gain.exponentialRampToValueAtTime(0.0001, stopAt);
+      bellGain.connect(filter);
+
+      const fundamental = audioCtx.createOscillator();
+      fundamental.type = "sine";
+      fundamental.frequency.setValueAtTime(frequency, startAt);
+      fundamental.detune.setValueAtTime(-3, startAt);
+      fundamental.connect(bellGain);
+
+      const overtone = audioCtx.createOscillator();
+      const overtoneGain = audioCtx.createGain();
+      overtone.type = "sine";
+      overtone.frequency.setValueAtTime(frequency * 2.01, startAt);
+      overtoneGain.gain.setValueAtTime(0.18, startAt);
+      overtoneGain.gain.exponentialRampToValueAtTime(0.0001, startAt + 1.15);
+      overtone.connect(overtoneGain);
+      overtoneGain.connect(bellGain);
+
+      fundamental.start(startAt);
+      overtone.start(startAt);
+      fundamental.stop(stopAt);
+      overtone.stop(stopAt);
     });
   } catch {
     // sin sonido si el navegador lo bloquea

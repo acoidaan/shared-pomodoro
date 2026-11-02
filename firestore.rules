@@ -10,6 +10,10 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/rooms/$(roomId)/members/$(request.auth.uid));
     }
 
+    function isRoomHost(roomId) {
+      return signedIn() && get(/databases/$(database)/documents/rooms/$(roomId)).data.hostId == request.auth.uid;
+    }
+
     match /sessions/{sessionId} {
       allow read: if signedIn();
 
@@ -38,11 +42,18 @@ service cloud.firestore {
       allow list: if false;
 
       allow create: if signedIn()
-        && request.resource.data.hostId == request.auth.uid;
+        && request.resource.data.hostId == request.auth.uid
+        && request.resource.data.timerUpdatedBy == request.auth.uid;
 
-      allow update: if signedIn()
-        && resource.data.hostId == request.auth.uid
-        && request.resource.data.hostId == resource.data.hostId;
+      allow update: if isRoomMember(roomId)
+        && request.resource.data.hostId == resource.data.hostId
+        && request.resource.data.timerUpdatedBy == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'timer',
+          'timerUpdatedBy',
+          'updatedAt',
+          'expiresAt'
+        ]);
 
       allow delete: if signedIn()
         && resource.data.hostId == request.auth.uid;
@@ -55,7 +66,7 @@ service cloud.firestore {
           && request.resource.data.uid == request.auth.uid;
 
         allow delete: if signedIn()
-          && memberId == request.auth.uid;
+          && (memberId == request.auth.uid || isRoomHost(roomId));
       }
 
       match /sessions/{sessionId} {
@@ -64,8 +75,8 @@ service cloud.firestore {
         allow create: if isRoomMember(roomId)
           && request.resource.data.ownerId == request.auth.uid;
 
-        allow delete: if isRoomMember(roomId)
-          && resource.data.ownerId == request.auth.uid;
+        allow delete: if signedIn()
+          && (resource.data.ownerId == request.auth.uid || isRoomHost(roomId));
 
         allow update: if false;
       }

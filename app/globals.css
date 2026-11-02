@@ -2812,6 +2812,16 @@ input:focus-visible {
   font-size: 0.67rem;
 }
 
+.room-close-btn {
+  color: #b9998e;
+}
+
+.room-close-btn.confirm {
+  border-color: rgba(216, 132, 105, 0.3);
+  color: #e2a08a;
+  background: rgba(216, 132, 105, 0.09);
+}
+
 .room-gate {
   max-width: 560px;
   min-height: 420px;
