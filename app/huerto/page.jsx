@@ -175,7 +175,7 @@ export default function GardenPage() {
       .then(setSessions)
       .catch(() =>
         setError(
-          "No se pudo cargar el huerto. Revisa la configuración de Supabase.",
+          "No se pudo cargar el huerto. Revisa la conexión con Firebase.",
         ),
       );
   }, []);
@@ -221,7 +221,10 @@ export default function GardenPage() {
   return (
     <div>
       <div className="stats-header">
-        <h1>🍅 El huerto</h1>
+        <div>
+          <span className="eyebrow">Progreso visual</span>
+          <h1>Tu huerto</h1>
+        </div>
         <span className="hint">
           Cada {MIN_PER_TOMATO} minutos de enfoque cultivan un tomate
         </span>
@@ -241,8 +244,8 @@ export default function GardenPage() {
       {gardens && gardens.length > 0 && (
         <>
           <div className="garden-group-summary">
-            Cosecha del grupo: <strong>{groupTomatoes} 🍅</strong> ·{" "}
-            {formatMinutes(groupMinutes)} de enfoque entre todos
+            Tu cosecha: <strong>{groupTomatoes} 🍅</strong> ·{" "}
+            {formatMinutes(groupMinutes)} de enfoque acumulado
           </div>
 
           <div className="gardens">

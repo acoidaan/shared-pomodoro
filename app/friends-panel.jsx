@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { hasSupabase } from "../lib/supabaseClient";
 import { avatarColor } from "../lib/avatar";
 import { formatTime, useTimer } from "./timer-context";
+import { useRoom } from "./room-context";
 
 function statusFor(friend, now) {
   if (friend.running && friend.endAt) {
@@ -22,6 +23,7 @@ function statusFor(friend, now) {
 
 export default function FriendsPanel() {
   const { friends, name, joinSession } = useTimer();
+  const roomSession = useRoom();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -29,12 +31,29 @@ export default function FriendsPanel() {
     return () => clearInterval(id);
   }, []);
 
-  if (!hasSupabase || friends.length === 0) return null;
+  const roomTimer = roomSession?.room?.timer;
+  const visibleFriends = roomSession
+    ? roomSession.members.map((member) => ({
+        ...member,
+        key: member.name,
+        memberId: member.uid || member.id,
+        mode: roomTimer?.mode,
+        phase: roomTimer?.phase,
+        running: roomTimer?.running,
+        endAt: roomTimer?.endsAt,
+        total: roomTimer?.total,
+      }))
+    : friends;
+
+  if ((!roomSession && !hasSupabase) || visibleFriends.length === 0) return null;
 
   const me = name.trim();
-  const sorted = [...friends].sort((a, b) => {
-    if (a.key === me) return -1;
-    if (b.key === me) return 1;
+  const myMemberId = roomSession?.user?.uid;
+  const sorted = [...visibleFriends].sort((a, b) => {
+    if (roomSession && a.memberId === myMemberId) return -1;
+    if (roomSession && b.memberId === myMemberId) return 1;
+    if (!roomSession && a.key === me) return -1;
+    if (!roomSession && b.key === me) return 1;
     if (a.running !== b.running) return a.running ? -1 : 1;
     return a.key.localeCompare(b.key);
   });
@@ -45,15 +64,15 @@ export default function FriendsPanel() {
         <div>
           <span className="eyebrow">Sala en directo</span>
           <h2 className="friends-title">
-            Personas conectadas
-            <span className="friends-count">{friends.length}</span>
+            {roomSession ? "Participantes y prioridades" : "Personas conectadas"}
+            <span className="friends-count">{visibleFriends.length}</span>
           </h2>
         </div>
         <div className="room-avatars" aria-hidden="true">
           {sorted.slice(0, 5).map((friend) => (
             <span
-              key={friend.key}
-              style={{ background: avatarColor(friend.key) }}
+              key={friend.memberId || friend.key}
+              style={{ background: friend.color || avatarColor(friend.key) }}
             >
               {friend.key.charAt(0).toUpperCase()}
             </span>
@@ -63,19 +82,25 @@ export default function FriendsPanel() {
 
       <div className="friends-grid">
         {sorted.map((friend) => {
-          const isMe = friend.key === me;
+          const isMe = roomSession
+            ? friend.memberId === myMemberId
+            : friend.key === me;
           const status = statusFor(friend, now);
           const joinable =
-            !isMe && friend.running && friend.endAt && friend.endAt - now > 5000;
+            !roomSession &&
+            !isMe &&
+            friend.running &&
+            friend.endAt &&
+            friend.endAt - now > 5000;
           const sharedTasks = Array.isArray(friend.tasks)
             ? friend.tasks.slice(0, 12)
             : [];
-          const color = avatarColor(friend.key);
+          const color = friend.color || avatarColor(friend.key);
 
           return (
             <article
               className="friend-card"
-              key={friend.key}
+              key={friend.memberId || friend.key}
               style={{ "--user-color": color }}
             >
               <div className="friend-row">

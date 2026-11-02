@@ -1,102 +1,134 @@
-# 🍅 shared pomodoro
+# Shared Pomodoro
 
-Pomodoro online para usar con tus amigos: cada uno entra con el mismo link, pone su
-nombre, hace sus pomodoros (o temporizadores normales) y todos podéis ver las
-estadísticas del grupo: ranking semanal, tiempo de enfoque y actividad reciente.
+Un espacio de concentración compartido para crear salas privadas, sincronizar un
+temporizador y enseñar las prioridades de cada participante en tiempo real.
 
-**Stack:** Next.js (React) + Supabase (base de datos gratis) + Vercel (hosting gratis).
+## Stack
 
----
+- Next.js + React
+- Firebase Authentication anónima
+- Cloud Firestore para salas, miembros, historial y estadísticas
+- Migración automática de sesiones guardadas anteriormente en el navegador
+- Vercel para el despliegue gratuito
 
-## 1. Probarlo en local (2 minutos)
+## Desarrollo local
 
 ```bash
-cd pomodoro-amigos
 npm install
 npm run dev
 ```
 
-Abre <http://localhost:3000>. Sin configurar nada más ya funciona, pero las sesiones
-se guardan solo en tu navegador. Para compartir estadísticas con tus amigos sigue
-los pasos 2 y 3.
+Abre <http://localhost:3000>. Los cambios se recargan automáticamente.
 
-## 2. Crear la base de datos en Supabase (gratis)
-
-1. Entra en <https://supabase.com> y crea una cuenta (con GitHub es un click).
-2. **New project** → ponle nombre (ej. `pomodoro-amigos`), elige una contraseña
-   de base de datos cualquiera y la región más cercana (Europe West). Plan **Free**.
-3. Cuando termine de crearse, ve a **SQL Editor** (icono de terminal en el menú
-   izquierdo) → pega TODO el contenido del archivo `supabase-schema.sql` → **Run**.
-4. Ve a **Project Settings → API** y copia dos valores:
-   - **Project URL** (algo como `https://abcdefgh.supabase.co`)
-   - **anon public key** (un token largo)
-5. En la carpeta del proyecto, copia `.env.local.example` a `.env.local` y pega
-   esos dos valores:
-
-```
-NEXT_PUBLIC_SUPABASE_URL=https://abcdefgh.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGci...
-```
-
-1. Reinicia `npm run dev`. Ahora las sesiones se guardan en la nube y la página
-   de estadísticas muestra a todo el mundo.
-
-> ⚠️ La `anon key` es pública por diseño (va en el navegador), no pasa nada por
-> exponerla. Lo que NUNCA debes exponer es la `service_role key`.
-
-## 3. Publicarlo en Vercel (gratis)
-
-### Opción A — con GitHub (recomendada, se actualiza sola)
-
-1. Crea un repo en GitHub y sube el proyecto:
+Para comprobar la versión de producción:
 
 ```bash
-git init
-git add .
-git commit -m "shared pomodoro"
-git branch -M main
-git remote add origin https://github.com/TU-USUARIO/pomodoro-amigos.git
-git push -u origin main
+npm run build
+npm start
 ```
 
-1. Entra en <https://vercel.com> → **Add New → Project** → importa el repo.
-2. Antes de darle a Deploy, abre **Environment Variables** y añade las dos
-   variables (las mismas de tu `.env.local`):
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-3. **Deploy**. En un minuto tendrás una URL tipo
-   `https://pomodoro-amigos.vercel.app` → **ese es el link que pasas a tus amigos**.
+## Configurar Firebase gratis
 
-Cada vez que hagas `git push`, Vercel redespliega solo.
+Firebase se utiliza para las salas reales. El plan Spark es suficiente para un
+proyecto personal y no requiere añadir un método de pago.
 
-### Opción B — sin GitHub (CLI)
+### 1. Crear el proyecto
+
+1. Abre <https://console.firebase.google.com/>.
+2. Pulsa **Crear un proyecto**.
+3. Puedes desactivar Google Analytics; no es necesario para esta aplicación.
+4. Dentro del proyecto, crea una **aplicación web** desde el icono `</>`.
+5. Firebase mostrará un objeto `firebaseConfig`. Conserva esos valores.
+
+### 2. Activar identificación anónima
+
+1. En Firebase abre **Authentication**.
+2. Pulsa **Comenzar**.
+3. En **Sign-in method**, activa el proveedor **Anónimo**.
+
+Cada navegador recibirá una identidad privada sin pedir registro, correo ni
+contraseña al usuario.
+
+### 3. Crear Firestore
+
+1. Abre **Firestore Database**.
+2. Pulsa **Crear base de datos**.
+3. Elige una región europea cercana.
+4. Puedes iniciar en modo producción: las reglas correctas están incluidas en
+   `firestore.rules`.
+
+### 4. Variables de entorno
+
+Copia el archivo de ejemplo:
 
 ```bash
-npm install -g vercel
-vercel login
-vercel --prod
+cp .env.local.example .env.local
 ```
 
-Te preguntará por el proyecto; acepta los valores por defecto. Luego añade las
-variables de entorno con `vercel env add NEXT_PUBLIC_SUPABASE_URL` y
-`vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY`, y vuelve a ejecutar `vercel --prod`.
+Rellena las variables con el objeto `firebaseConfig` mostrado por Firebase:
 
-## Cómo funciona
+```env
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+```
 
-- **Temporizador** (`app/page.jsx`): modo Pomodoro (trabajo/descanso/descanso
-  largo cada 4 ciclos, duraciones configurables) o modo temporizador normal.
-  El conteo usa timestamps reales, así que no se desincroniza aunque la pestaña
-  quede en segundo plano. Suena un aviso y manda notificación al terminar.
-- **Estadísticas** (`app/stats/page.jsx`): ranking semanal con barras, totales
-  del grupo y feed de actividad reciente. Tu nombre aparece resaltado.
-- **Sala en tiempo real** (`app/friends-panel.jsx` + presencia en
-  `app/timer-context.jsx`): todos los que tienen la página abierta aparecen en
-  el panel «En la sala ahora», con su estado (concentrado/descansando) y cuánto
-  les queda, en directo vía Supabase Realtime Presence. El botón «Unirme»
-  sincroniza tu reloj con el de un amigo para terminar a la vez. No usa la base
-  de datos: al cerrar la pestaña desapareces de la sala automáticamente.
-- **Datos** (`lib/sessions.js`): cada sesión completada se inserta en la tabla
-  `sessions` de Supabase con nombre, modo, minutos y fecha. Sin Supabase
-  configurado, guarda en localStorage como fallback.
-- **Identidad**: no hay login; cada uno escribe su nombre una vez y queda
-  guardado en su navegador. Suficiente para un grupo de amigos de confianza.
+Esta configuración es pública por diseño. La seguridad depende de
+`firestore.rules`, no de ocultar estos valores.
+
+### 5. Publicar las reglas
+
+Con Firebase CLI:
+
+```bash
+npx firebase-tools login
+npx firebase-tools use --add
+npx firebase-tools deploy --only firestore:rules
+```
+
+También puedes copiar manualmente `firestore.rules` en **Firestore → Rules** y
+pulsar **Publicar**.
+
+Reinicia `npm run dev` después de crear `.env.local`.
+
+## Salas
+
+- El anfitrión pulsa **Crear sala**.
+- Se genera un código corto y una URL como `/room/ABC123`.
+- Los invitados entran mediante el enlace o escribiendo el código.
+- El anfitrión controla el temporizador.
+- Todos reciben el mismo estado y la misma hora de finalización.
+- Cada participante conserva su color pastel y solo edita su propia lista.
+- Las listas de enfoque se muestran al resto en tiempo real.
+
+## Historial y estadísticas
+
+Cada sesión terminada se guarda en el historial privado del usuario anónimo. Si
+se completa dentro de una sala, también se registra en el historial de esa sala
+para poder añadir estadísticas compartidas más adelante.
+
+Al abrir las estadísticas por primera vez, las sesiones que todavía existan en
+`localStorage` se migran automáticamente a Firebase una sola vez.
+
+Supabase ya no se utiliza para guardar sesiones. Sus variables permanecen como
+compatibilidad temporal con el antiguo canal global de presencia y se eliminarán
+cuando toda la experiencia use exclusivamente salas privadas.
+
+## Despliegue gratuito en Vercel
+
+1. Importa el repositorio desde <https://vercel.com/>.
+2. Añade las variables `NEXT_PUBLIC_FIREBASE_*` en **Environment Variables**.
+3. Despliega el proyecto.
+
+No incluyas `.env.local` en Git. Cada `git push` a la rama configurada provocará
+un nuevo despliegue automático.
+
+## Próximos pasos
+
+- Estadísticas específicas para cada sala.
+- Recuperación del control cuando el anfitrión se desconecta.
+- Invitaciones directas y perfiles opcionales.
+- Overlay transparente para OBS con temporizador, estado y bullet list.

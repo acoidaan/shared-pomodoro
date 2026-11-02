@@ -106,6 +106,8 @@ export function TimerProvider({ children }) {
 
   const endAtRef = useRef(null);
   const intervalRef = useRef(null);
+  const sharedSyncRef = useRef(false);
+  const sessionContextRef = useRef({ roomCode: null });
 
   const totalPlanPomodoros = cycles * CYCLES_BEFORE_LONG_BREAK;
 
@@ -188,6 +190,12 @@ export function TimerProvider({ children }) {
     [updateTasks],
   );
 
+  const setSessionContext = useCallback((context) => {
+    sessionContextRef.current = {
+      roomCode: context?.roomCode || null,
+    };
+  }, []);
+
   const durationForPhase = useCallback(
     (ph) => {
       if (mode === "timer") return timerMin * 60;
@@ -201,7 +209,7 @@ export function TimerProvider({ children }) {
   // Si cambian los ajustes de duración con el temporizador parado, actualizar la cuenta.
   // Ojo: `running` NO está en las dependencias a propósito — pausar no debe resetear el tiempo.
   useEffect(() => {
-    if (running) return;
+    if (running || sharedSyncRef.current) return;
     const d = durationForPhase(phase);
     setRemaining(d);
     setTotal(d);
@@ -309,9 +317,10 @@ export function TimerProvider({ children }) {
         name: name.trim(),
         mode: "timer",
         minutes: sessionMinutes,
+        roomCode: sessionContextRef.current.roomCode,
       }).catch(() =>
         setSaveError(
-          "No se pudo guardar la sesión. Revisa tu conexión o la configuración de Supabase.",
+          "No se pudo guardar la sesión. Revisa tu conexión con Firebase.",
         ),
       );
       const d = timerMin * 60;
@@ -329,9 +338,10 @@ export function TimerProvider({ children }) {
         name: name.trim(),
         mode: "pomodoro",
         minutes: sessionMinutes,
+        roomCode: sessionContextRef.current.roomCode,
       }).catch(() =>
         setSaveError(
-          "No se pudo guardar la sesión. Revisa tu conexión o la configuración de Supabase.",
+          "No se pudo guardar la sesión. Revisa tu conexión con Firebase.",
         ),
       );
       const nextPhase =
@@ -464,6 +474,41 @@ export function TimerProvider({ children }) {
     [mode, timerMin, workMin],
   );
 
+  const syncSharedState = useCallback((sharedTimer) => {
+    if (!sharedTimer) return;
+    sharedSyncRef.current = true;
+
+    const nextMode = sharedTimer.mode === "timer" ? "timer" : "pomodoro";
+    const nextPhase = ["work", "break", "longBreak"].includes(
+      sharedTimer.phase,
+    )
+      ? sharedTimer.phase
+      : "work";
+    const nextTotal = Math.max(1, Number(sharedTimer.total) || 25 * 60);
+    const nextRunning = Boolean(sharedTimer.running && sharedTimer.endsAt);
+    const nextRemaining = nextRunning
+      ? Math.max(0, (Number(sharedTimer.endsAt) - Date.now()) / 1000)
+      : Math.max(0, Number(sharedTimer.remaining) || nextTotal);
+
+    setMode(nextMode);
+    setPhase(nextPhase);
+    setWorkMin(Math.max(1, Number(sharedTimer.workMin) || 25));
+    setBreakMin(Math.max(1, Number(sharedTimer.breakMin) || 5));
+    setLongBreakMin(Math.max(1, Number(sharedTimer.longBreakMin) || 15));
+    setTimerMin(Math.max(1, Number(sharedTimer.timerMin) || 30));
+    setCycles(Math.min(8, Math.max(1, Number(sharedTimer.cycles) || 1)));
+    setPlanPos(Math.max(0, Number(sharedTimer.planPos) || 0));
+    setPlanDone(Boolean(sharedTimer.planDone));
+    setTotal(nextTotal);
+    setRemaining(nextRemaining);
+    endAtRef.current = nextRunning ? Number(sharedTimer.endsAt) : null;
+    setRunning(nextRunning && nextRemaining > 0);
+
+    window.setTimeout(() => {
+      sharedSyncRef.current = false;
+    }, 0);
+  }, []);
+
   // Engancharse a la sesión en curso de un amigo: mismo fin, mismo reloj.
   const joinSession = useCallback((friend) => {
     if (!friend.running || !friend.endAt || friend.endAt <= Date.now()) return;
@@ -507,6 +552,8 @@ export function TimerProvider({ children }) {
     addTask,
     toggleTask,
     removeTask,
+    syncSharedState,
+    setSessionContext,
     start,
     pause,
     reset,

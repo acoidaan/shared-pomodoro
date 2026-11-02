@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useReducer, useState } from "react";
-import { hasSupabase } from "../lib/supabaseClient";
+import { hasFirebase } from "../lib/firebaseClient";
 import { avatarColor } from "../lib/avatar";
 import FriendsPanel from "./friends-panel";
 import FocusTasks from "./focus-tasks";
+import { RoomLauncher, RoomToolbar } from "./room-controls";
+import { useRoom } from "./room-context";
 import {
   CYCLES_BEFORE_LONG_BREAK,
   formatTime,
@@ -108,6 +110,8 @@ export default function TimerPage() {
     skipPhase,
     switchMode,
   } = useTimer();
+  const roomSession = useRoom();
+  const controlsLocked = Boolean(roomSession && !roomSession.isHost);
 
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState("");
@@ -200,10 +204,20 @@ export default function TimerPage() {
 
       <section className="dashboard-heading">
         <div>
-          <span className="eyebrow">Panel de concentración</span>
-          <h1>Tu próxima sesión empieza aquí.</h1>
+          <span className="eyebrow">
+            {roomSession ? "Sesión compartida" : "Panel de concentración"}
+          </span>
+          <h1>
+            {roomSession
+              ? `Enfócate junto a ${Math.max(0, roomSession.members.length - 1)} ${roomSession.members.length === 2 ? "persona" : "personas"}.`
+              : "Tu próxima sesión empieza aquí."}
+          </h1>
           <p>
-            Define tu ritmo, elimina distracciones y avanza en lo que importa.
+            {roomSession
+              ? roomSession.isHost
+                ? "Tú marcas el ritmo; el temporizador se sincroniza para toda la sala."
+                : "El anfitrión controla el reloj. Tu lista de enfoque sigue siendo solo tuya para editar."
+              : "Define tu ritmo, elimina distracciones y avanza en lo que importa."}
           </p>
         </div>
 
@@ -228,7 +242,7 @@ export default function TimerPage() {
         )}
       </section>
 
-      {!hasSupabase && (
+      {!hasFirebase && !roomSession && (
         <div className="local-notice">
           <span className="local-notice-icon" aria-hidden="true">i</span>
           <div>
@@ -263,18 +277,22 @@ export default function TimerPage() {
         </div>
       </div>
 
+      {roomSession ? <RoomToolbar /> : <RoomLauncher />}
+
       <div className="focus-layout">
         <section className={`card timer-card ${running ? "is-running" : ""}`}>
           <div className="timer-card-head">
             <div className="mode-switch" aria-label="Tipo de temporizador">
               <button
                 className={mode === "pomodoro" ? "active" : ""}
+                disabled={controlsLocked}
                 onClick={() => switchMode("pomodoro")}
               >
                 Pomodoro
               </button>
               <button
                 className={mode === "timer" ? "active" : ""}
+                disabled={controlsLocked}
                 onClick={() => switchMode("timer")}
               >
                 Temporizador
@@ -325,23 +343,36 @@ export default function TimerPage() {
               <button
                 className="btn btn-primary btn-start"
                 onClick={start}
-                disabled={!name.trim()}
+                disabled={!name.trim() || controlsLocked}
               >
                 <PlayIcon />
                 {remaining < total ? "Continuar sesión" : "Empezar sesión"}
               </button>
             ) : (
-              <button className="btn btn-primary btn-start" onClick={pause}>
+              <button
+                className="btn btn-primary btn-start"
+                onClick={pause}
+                disabled={controlsLocked}
+              >
                 <PauseIcon />
                 Pausar sesión
               </button>
             )}
-            <button className="btn btn-icon" onClick={reset} title="Reiniciar sesión">
+            <button
+              className="btn btn-icon"
+              onClick={reset}
+              title="Reiniciar sesión"
+              disabled={controlsLocked}
+            >
               <ResetIcon />
               <span>Reiniciar</span>
             </button>
             {mode === "pomodoro" && isBreak && (
-              <button className="btn btn-ghost" onClick={skipPhase}>
+              <button
+                className="btn btn-ghost"
+                onClick={skipPhase}
+                disabled={controlsLocked}
+              >
                 Saltar descanso
               </button>
             )}
@@ -371,7 +402,7 @@ export default function TimerPage() {
             </span>
           </div>
 
-          {!running && mode === "timer" && (
+          {!running && !controlsLocked && mode === "timer" && (
             <div className="setting-group">
               <span className="setting-title">Duraciones rápidas</span>
               <div className="preset-chips">
@@ -389,7 +420,7 @@ export default function TimerPage() {
             </div>
           )}
 
-          {!running && (
+          {!running && !controlsLocked && (
             <div className={`settings ${mode === "timer" ? "single" : ""}`}>
               {mode === "pomodoro" ? (
                 <>
@@ -435,7 +466,7 @@ export default function TimerPage() {
             </div>
           )}
 
-          {running && (
+          {(running || controlsLocked) && (
             <div className="live-session-summary">
               <div>
                 <span>Fase actual</span>

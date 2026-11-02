@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { hasSupabase } from "../lib/supabaseClient";
+import { hasFirebase } from "../lib/firebaseClient";
 import { avatarColor } from "../lib/avatar";
 import { useTimer } from "./timer-context";
+import { useRoom } from "./room-context";
 
 export default function FocusTasks() {
   const { name, tasks, addTask, toggleTask, removeTask } = useTimer();
+  const roomSession = useRoom();
   const [draft, setDraft] = useState("");
   const color = avatarColor(name || "Usuario");
   const completed = tasks.filter((task) => task.done).length;
@@ -78,9 +81,13 @@ export default function FocusTasks() {
 
       <p className="task-sharing-state">
         <span />
-        {hasSupabase
-          ? "Las personas conectadas pueden ver esta lista en tiempo real"
-          : "Guardada en este dispositivo; se compartirá al entrar en una sala"}
+        {roomSession
+          ? "Visible en tiempo real para todas las personas de esta sala"
+          : hasSupabase
+            ? "Las personas conectadas pueden ver esta lista en tiempo real"
+            : hasFirebase
+              ? "Guardada en Firebase; se compartirá cuando entres en una sala"
+              : "Guardada en este dispositivo; se compartirá al entrar en una sala"}
       </p>
     </section>
   );

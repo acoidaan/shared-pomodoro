@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useMemo, useState } from 'react';
-import { hasSupabase } from '../../lib/supabaseClient';
-import { loadSessions } from '../../lib/sessions';
+import { useEffect, useMemo, useState } from "react";
+import { hasFirebase } from "../../lib/firebaseClient";
+import { loadSessions } from "../../lib/sessions";
 
 function formatMinutes(min) {
   if (min < 60) return `${min} min`;
@@ -11,173 +11,248 @@ function formatMinutes(min) {
   return m === 0 ? `${h} h` : `${h} h ${m} min`;
 }
 
-function isSameLocalDay(a, b) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+function dayKey(date) {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
 function timeAgo(date) {
   const diffMs = Date.now() - date.getTime();
   const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'ahora mismo';
+  if (mins < 1) return "ahora mismo";
   if (mins < 60) return `hace ${mins} min`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `hace ${hours} h`;
   const days = Math.floor(hours / 24);
-  if (days === 1) return 'ayer';
+  if (days === 1) return "ayer";
   if (days < 7) return `hace ${days} días`;
-  return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  return date.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+}
+
+function calculateStreak(minutesByDay) {
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+
+  if (!minutesByDay.get(dayKey(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  let streak = 0;
+  while (minutesByDay.get(dayKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
 }
 
 export default function StatsPage() {
   const [sessions, setSessions] = useState(null);
-  const [error, setError] = useState('');
-  const [myName, setMyName] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    setMyName(localStorage.getItem('pomodoro-amigos-name') || '');
     loadSessions()
       .then(setSessions)
-      .catch(() => setError('No se pudieron cargar las estadísticas. Revisa la configuración de Supabase.'));
+      .catch(() =>
+        setError(
+          "No se pudieron cargar tus estadísticas. Revisa la conexión con Firebase.",
+        ),
+      );
   }, []);
 
   const stats = useMemo(() => {
     if (!sessions) return null;
 
     const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    const byUser = new Map();
+    const today = dayKey(now);
+    const minutesByDay = new Map();
     let totalMinutes = 0;
-    let todayMinutes = 0;
+    let pomodoros = 0;
 
-    for (const s of sessions) {
-      const date = new Date(s.completed_at);
-      const minutes = Number(s.minutes) || 0;
+    for (const session of sessions) {
+      const date = new Date(session.completed_at);
+      const minutes = Number(session.minutes) || 0;
+      const key = dayKey(date);
       totalMinutes += minutes;
-      const isToday = isSameLocalDay(date, now);
-      if (isToday) todayMinutes += minutes;
-
-      const key = s.name || 'Anónimo';
-      if (!byUser.has(key)) {
-        byUser.set(key, { name: key, total: 0, week: 0, today: 0, count: 0, pomodoros: 0 });
-      }
-      const u = byUser.get(key);
-      u.total += minutes;
-      u.count += 1;
-      if (s.mode === 'pomodoro') u.pomodoros += 1;
-      if (date >= weekAgo) u.week += minutes;
-      if (isToday) u.today += minutes;
+      minutesByDay.set(key, (minutesByDay.get(key) || 0) + minutes);
+      if (session.mode === "pomodoro") pomodoros += 1;
     }
 
-    const leaderboard = [...byUser.values()].sort((a, b) => b.week - a.week || b.total - a.total);
-    const maxWeek = Math.max(1, ...leaderboard.map((u) => u.week));
+    const lastSevenDays = Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(now);
+      date.setHours(0, 0, 0, 0);
+      date.setDate(date.getDate() - (6 - index));
+      return {
+        key: dayKey(date),
+        label: date
+          .toLocaleDateString("es-ES", { weekday: "short" })
+          .replace(".", ""),
+        date,
+        minutes: minutesByDay.get(dayKey(date)) || 0,
+      };
+    });
+    const weekMinutes = lastSevenDays.reduce((sum, day) => sum + day.minutes, 0);
+    const maxDay = Math.max(30, ...lastSevenDays.map((day) => day.minutes));
+    const activeDays = [...minutesByDay.values()].filter(Boolean).length;
 
     return {
-      leaderboard,
-      maxWeek,
       totalMinutes,
-      todayMinutes,
+      todayMinutes: minutesByDay.get(today) || 0,
+      weekMinutes,
+      pomodoros,
       totalSessions: sessions.length,
-      people: byUser.size,
-      recent: sessions.slice(0, 20),
+      average:
+        sessions.length > 0 ? Math.round(totalMinutes / sessions.length) : 0,
+      activeDays,
+      streak: calculateStreak(minutesByDay),
+      lastSevenDays,
+      maxDay,
+      recent: sessions.slice(0, 12),
     };
   }, [sessions]);
 
   return (
-    <div>
-      <div className="stats-header">
-        <h1>📊 Estadísticas</h1>
-        <span className="hint">
-          {hasSupabase
-            ? 'Datos compartidos de todo el grupo'
-            : 'Solo datos de este navegador (Supabase sin configurar)'}
+    <div className="stats-page">
+      <div className="stats-header stats-page-head">
+        <div>
+          <span className="eyebrow">Tu progreso</span>
+          <h1>Estadísticas de enfoque</h1>
+          <p>
+            Una vista sencilla de tu constancia, sin compararte con nadie más.
+          </p>
+        </div>
+        <span className={`data-source ${hasFirebase ? "cloud" : "local"}`}>
+          <span /> {hasFirebase ? "Sincronizado con Firebase" : "Guardado localmente"}
         </span>
       </div>
 
-      {error && <div className="banner">⚠️ {error}</div>}
-
-      {!sessions && !error && <p className="empty-state">Cargando…</p>}
+      {error && <div className="banner">{error}</div>}
+      {!sessions && !error && <p className="empty-state">Preparando tus datos…</p>}
 
       {stats && stats.totalSessions === 0 && (
-        <p className="empty-state">
-          Todavía no hay sesiones. ¡Completa tu primer pomodoro y aparecerá aquí! 🍅
-        </p>
+        <div className="stats-empty card">
+          <span className="stats-empty-mark">01</span>
+          <h2>Tu historial empieza con una sesión.</h2>
+          <p>
+            Completa un pomodoro y aquí aparecerán tu tiempo, tu ritmo semanal y
+            tu racha de concentración.
+          </p>
+        </div>
       )}
 
       {stats && stats.totalSessions > 0 && (
         <>
-          <div className="summary-grid">
-            <div className="summary-card">
+          <div className="summary-grid personal-summary">
+            <div className="summary-card featured">
+              <span className="summary-index">01</span>
               <div className="value">{formatMinutes(stats.todayMinutes)}</div>
-              <div className="label">Enfoque total hoy (grupo)</div>
+              <div className="label">Concentración de hoy</div>
             </div>
             <div className="summary-card">
+              <span className="summary-index">02</span>
+              <div className="value">{formatMinutes(stats.weekMinutes)}</div>
+              <div className="label">Últimos siete días</div>
+            </div>
+            <div className="summary-card">
+              <span className="summary-index">03</span>
+              <div className="value">
+                {stats.streak} {stats.streak === 1 ? "día" : "días"}
+              </div>
+              <div className="label">Racha actual</div>
+            </div>
+            <div className="summary-card">
+              <span className="summary-index">04</span>
               <div className="value">{formatMinutes(stats.totalMinutes)}</div>
-              <div className="label">Enfoque total acumulado</div>
-            </div>
-            <div className="summary-card">
-              <div className="value">{stats.totalSessions}</div>
-              <div className="label">Sesiones completadas</div>
-            </div>
-            <div className="summary-card">
-              <div className="value">{stats.people}</div>
-              <div className="label">Personas participando</div>
+              <div className="label">Tiempo acumulado</div>
             </div>
           </div>
 
-          <h2 className="section-title">🏆 Ranking de la semana</h2>
-          <table className="leaderboard">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Nombre</th>
-                <th>Esta semana</th>
-                <th>Hoy</th>
-                <th>Total</th>
-                <th>Pomodoros</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.leaderboard.map((u, i) => (
-                <tr key={u.name}>
-                  <td>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}</td>
-                  <td className={u.name === myName ? 'me' : ''}>{u.name}</td>
-                  <td className="num">
-                    <div className="bar-row">
-                      <div className="bar-track">
-                        <div className="bar-fill" style={{ width: `${(u.week / stats.maxWeek) * 100}%` }} />
-                      </div>
-                      <span>{formatMinutes(u.week)}</span>
-                    </div>
-                  </td>
-                  <td className="num">{formatMinutes(u.today)}</td>
-                  <td className="num">{formatMinutes(u.total)}</td>
-                  <td className="num">{u.pomodoros}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <h2 className="section-title">🕒 Actividad reciente</h2>
-          <div className="feed">
-            {stats.recent.map((s, i) => {
-              const date = new Date(s.completed_at);
-              return (
-                <div className="feed-item" key={s.id ?? i}>
-                  <span className="who">
-                    <strong>{s.name}</strong> completó{' '}
-                    {s.mode === 'pomodoro' ? 'un pomodoro' : 'un temporizador'} de {s.minutes} min{' '}
-                    {s.mode === 'pomodoro' ? '🍅' : '⏱️'}
-                  </span>
-                  <span className="when">{timeAgo(date)}</span>
+          <div className="stats-layout">
+            <section className="card weekly-card">
+              <div className="stats-section-head">
+                <div>
+                  <span className="eyebrow">Últimos siete días</span>
+                  <h2>Tu ritmo semanal</h2>
                 </div>
-              );
-            })}
+                <strong>{formatMinutes(stats.weekMinutes)}</strong>
+              </div>
+              <div className="weekly-chart">
+                {stats.lastSevenDays.map((day) => (
+                  <div className="weekly-day" key={day.key}>
+                    <span className="weekly-value">
+                      {day.minutes ? formatMinutes(day.minutes) : ""}
+                    </span>
+                    <div className="weekly-track">
+                      <div
+                        className="weekly-bar"
+                        style={{
+                          height: `${Math.max(4, (day.minutes / stats.maxDay) * 100)}%`,
+                          opacity: day.minutes ? 1 : 0.18,
+                        }}
+                      />
+                    </div>
+                    <span className="weekly-label">{day.label}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <aside className="card stats-details">
+              <div className="stats-section-head">
+                <div>
+                  <span className="eyebrow">Resumen</span>
+                  <h2>Tu forma de trabajar</h2>
+                </div>
+              </div>
+              <dl>
+                <div>
+                  <dt>Sesiones terminadas</dt>
+                  <dd>{stats.totalSessions}</dd>
+                </div>
+                <div>
+                  <dt>Pomodoros completados</dt>
+                  <dd>{stats.pomodoros}</dd>
+                </div>
+                <div>
+                  <dt>Duración media</dt>
+                  <dd>{formatMinutes(stats.average)}</dd>
+                </div>
+                <div>
+                  <dt>Días con actividad</dt>
+                  <dd>{stats.activeDays}</dd>
+                </div>
+              </dl>
+            </aside>
           </div>
+
+          <section className="recent-section">
+            <div className="stats-section-head">
+              <div>
+                <span className="eyebrow">Historial</span>
+                <h2>Sesiones recientes</h2>
+              </div>
+            </div>
+            <div className="feed personal-feed">
+              {stats.recent.map((session, index) => {
+                const date = new Date(session.completed_at);
+                return (
+                  <div className="feed-item" key={session.id ?? index}>
+                    <span
+                      className={`session-type-dot ${session.mode === "timer" ? "timer" : ""}`}
+                    />
+                    <span className="who">
+                      <strong>
+                        {session.mode === "pomodoro" ? "Pomodoro" : "Temporizador"}
+                      </strong>
+                      <small>{session.minutes} minutos de concentración</small>
+                    </span>
+                    {session.roomCode && (
+                      <span className="session-room">Sala {session.roomCode}</span>
+                    )}
+                    <span className="when">{timeAgo(date)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         </>
       )}
     </div>
