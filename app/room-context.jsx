@@ -220,14 +220,19 @@ export function RoomProvider({ code, children }) {
       planPos: timer.planPos,
       planDone: timer.planDone,
     };
-    if (timerSignature(sharedTimer) === remoteTimerSignatureRef.current) return;
+    const nextSignature = timerSignature(sharedTimer);
+    if (nextSignature === remoteTimerSignatureRef.current) return;
 
     const timeout = window.setTimeout(() => {
+      remoteTimerSignatureRef.current = nextSignature;
       updateRoomTimer({
         code,
         updatedBy: user.uid,
         timer: sharedTimer,
-      }).catch(() => setError("No se pudo sincronizar el temporizador."));
+      }).catch(() => {
+        remoteTimerSignatureRef.current = "";
+        setError("No se pudo sincronizar el temporizador.");
+      });
     }, 120);
 
     return () => window.clearTimeout(timeout);
