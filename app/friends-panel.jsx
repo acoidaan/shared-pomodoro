@@ -1,19 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { hasSupabase } from "../lib/supabaseClient";
 import { avatarColor } from "../lib/avatar";
-import { formatTime, useTimer } from "./timer-context";
+import { formatTime } from "./timer-context";
 import { useRoom } from "./room-context";
 
-function statusFor(friend, now) {
-  if (friend.running && friend.endAt) {
-    const left = (friend.endAt - now) / 1000;
+function statusFor(member, now) {
+  if (member.running && member.endAt) {
+    const left = (member.endAt - now) / 1000;
     if (left <= 0) return { label: "Terminando…", left: null, kind: "ending" };
-    if (friend.mode === "timer") {
+    if (member.mode === "timer") {
       return { label: "Temporizador", left, kind: "timer" };
     }
-    if (friend.phase === "work") {
+    if (member.phase === "work") {
       return { label: "En concentración", left, kind: "focus" };
     }
     return { label: "En descanso", left, kind: "break" };
@@ -22,7 +21,6 @@ function statusFor(friend, now) {
 }
 
 export default function FriendsPanel() {
-  const { friends, name, joinSession } = useTimer();
   const roomSession = useRoom();
   const [now, setNow] = useState(() => Date.now());
 
@@ -31,32 +29,25 @@ export default function FriendsPanel() {
     return () => clearInterval(id);
   }, []);
 
-  const roomTimer = roomSession?.room?.timer;
-  const visibleFriends = roomSession
-    ? roomSession.members.map((member) => ({
-        ...member,
-        key: member.name,
-        memberId: member.uid || member.id,
-        mode: roomTimer?.mode,
-        phase: roomTimer?.phase,
-        running: roomTimer?.running,
-        endAt: roomTimer?.endsAt,
-        total: roomTimer?.total,
-      }))
-    : friends;
+  if (!roomSession || roomSession.members.length === 0) return null;
 
-  if ((!roomSession && !hasSupabase) || visibleFriends.length === 0) return null;
-
-  const me = name.trim();
-  const myMemberId = roomSession?.user?.uid;
-  const sorted = [...visibleFriends].sort((a, b) => {
-    if (roomSession && a.memberId === myMemberId) return -1;
-    if (roomSession && b.memberId === myMemberId) return 1;
-    if (!roomSession && a.key === me) return -1;
-    if (!roomSession && b.key === me) return 1;
-    if (a.running !== b.running) return a.running ? -1 : 1;
-    return a.key.localeCompare(b.key);
-  });
+  const roomTimer = roomSession.room?.timer;
+  const myMemberId = roomSession.user?.uid;
+  const members = roomSession.members
+    .map((member) => ({
+      ...member,
+      key: member.name,
+      memberId: member.uid || member.id,
+      mode: roomTimer?.mode,
+      phase: roomTimer?.phase,
+      running: roomTimer?.running,
+      endAt: roomTimer?.endsAt,
+    }))
+    .sort((a, b) => {
+      if (a.memberId === myMemberId) return -1;
+      if (b.memberId === myMemberId) return 1;
+      return a.key.localeCompare(b.key);
+    });
 
   return (
     <section className="card friends-panel">
@@ -64,51 +55,43 @@ export default function FriendsPanel() {
         <div>
           <span className="eyebrow">Sala en directo</span>
           <h2 className="friends-title">
-            {roomSession ? "Participantes y prioridades" : "Personas conectadas"}
-            <span className="friends-count">{visibleFriends.length}</span>
+            Participantes y prioridades
+            <span className="friends-count">{members.length}</span>
           </h2>
         </div>
         <div className="room-avatars" aria-hidden="true">
-          {sorted.slice(0, 5).map((friend) => (
+          {members.slice(0, 5).map((member) => (
             <span
-              key={friend.memberId || friend.key}
-              style={{ background: friend.color || avatarColor(friend.key) }}
+              key={member.memberId}
+              style={{ background: member.color || avatarColor(member.key) }}
             >
-              {friend.key.charAt(0).toUpperCase()}
+              {member.key.charAt(0).toUpperCase()}
             </span>
           ))}
         </div>
       </div>
 
       <div className="friends-grid">
-        {sorted.map((friend) => {
-          const isMe = roomSession
-            ? friend.memberId === myMemberId
-            : friend.key === me;
-          const status = statusFor(friend, now);
-          const joinable =
-            !roomSession &&
-            !isMe &&
-            friend.running &&
-            friend.endAt &&
-            friend.endAt - now > 5000;
-          const sharedTasks = Array.isArray(friend.tasks)
-            ? friend.tasks.slice(0, 12)
+        {members.map((member) => {
+          const isMe = member.memberId === myMemberId;
+          const status = statusFor(member, now);
+          const sharedTasks = Array.isArray(member.tasks)
+            ? member.tasks.slice(0, 12)
             : [];
-          const color = friend.color || avatarColor(friend.key);
+          const color = member.color || avatarColor(member.key);
 
           return (
             <article
               className="friend-card"
-              key={friend.memberId || friend.key}
+              key={member.memberId}
               style={{ "--user-color": color }}
             >
               <div className="friend-row">
                 <span className="avatar" style={{ background: color }}>
-                  {friend.key.charAt(0).toUpperCase()}
+                  {member.key.charAt(0).toUpperCase()}
                 </span>
                 <span className="friend-name">
-                  {friend.key}
+                  {member.key}
                   {isMe && <small>Tú</small>}
                 </span>
                 <span className={`friend-status ${status.kind}`}>
@@ -120,15 +103,6 @@ export default function FriendsPanel() {
                     </strong>
                   )}
                 </span>
-                {joinable && (
-                  <button
-                    className="btn join-btn"
-                    title={`Unirte a la sesión de ${friend.key}`}
-                    onClick={() => joinSession(friend)}
-                  >
-                    Unirme
-                  </button>
-                )}
               </div>
 
               <div className="shared-focus-list">

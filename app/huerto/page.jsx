@@ -222,8 +222,8 @@ export default function GardenPage() {
     <div>
       <div className="stats-header">
         <div>
-          <span className="eyebrow">Progreso visual</span>
-          <h1>Tu huerto</h1>
+          <span className="eyebrow">Progreso compartido</span>
+          <h1>El huerto del grupo</h1>
         </div>
         <span className="hint">
           Cada {MIN_PER_TOMATO} minutos de enfoque cultivan un tomate
@@ -244,8 +244,8 @@ export default function GardenPage() {
       {gardens && gardens.length > 0 && (
         <>
           <div className="garden-group-summary">
-            Tu cosecha: <strong>{groupTomatoes} 🍅</strong> ·{" "}
-            {formatMinutes(groupMinutes)} de enfoque acumulado
+            Cosecha del grupo: <strong>{groupTomatoes} 🍅</strong> ·{" "}
+            {formatMinutes(groupMinutes)} de enfoque entre todos
           </div>
 
           <div className="gardens">

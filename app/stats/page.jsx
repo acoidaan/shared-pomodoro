@@ -1,8 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { avatarColor } from "../../lib/avatar";
 import { hasFirebase } from "../../lib/firebaseClient";
 import { loadSessions } from "../../lib/sessions";
+import { useTimer } from "../timer-context";
 
 function formatMinutes(min) {
   if (min < 60) return `${min} min`;
@@ -31,10 +34,7 @@ function timeAgo(date) {
 function calculateStreak(minutesByDay) {
   const cursor = new Date();
   cursor.setHours(0, 0, 0, 0);
-
-  if (!minutesByDay.get(dayKey(cursor))) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
+  if (!minutesByDay.get(dayKey(cursor))) cursor.setDate(cursor.getDate() - 1);
 
   let streak = 0;
   while (minutesByDay.get(dayKey(cursor))) {
@@ -44,19 +44,25 @@ function calculateStreak(minutesByDay) {
   return streak;
 }
 
-export default function StatsPage() {
+export function StatsDashboard({ roomCode = null }) {
+  const { name } = useTimer();
   const [sessions, setSessions] = useState(null);
   const [error, setError] = useState("");
+  const isRoom = Boolean(roomCode);
 
   useEffect(() => {
-    loadSessions()
+    setSessions(null);
+    setError("");
+    loadSessions({ roomCode })
       .then(setSessions)
       .catch(() =>
         setError(
-          "No se pudieron cargar tus estadísticas. Revisa la conexión con Firebase.",
+          isRoom
+            ? "No se pudo cargar el historial de la sala."
+            : "No se pudieron cargar tus estadísticas. Revisa la conexión con Firebase.",
         ),
       );
-  }, []);
+  }, [roomCode, isRoom]);
 
   const stats = useMemo(() => {
     if (!sessions) return null;
@@ -64,6 +70,7 @@ export default function StatsPage() {
     const now = new Date();
     const today = dayKey(now);
     const minutesByDay = new Map();
+    const byUser = new Map();
     let totalMinutes = 0;
     let pomodoros = 0;
 
@@ -71,9 +78,17 @@ export default function StatsPage() {
       const date = new Date(session.completed_at);
       const minutes = Number(session.minutes) || 0;
       const key = dayKey(date);
+      const name = session.name || "Invitado";
       totalMinutes += minutes;
       minutesByDay.set(key, (minutesByDay.get(key) || 0) + minutes);
       if (session.mode === "pomodoro") pomodoros += 1;
+
+      if (!byUser.has(name)) {
+        byUser.set(name, { name, minutes: 0, week: 0, sessions: 0 });
+      }
+      const user = byUser.get(name);
+      user.minutes += minutes;
+      user.sessions += 1;
     }
 
     const lastSevenDays = Array.from({ length: 7 }, (_, index) => {
@@ -85,13 +100,21 @@ export default function StatsPage() {
         label: date
           .toLocaleDateString("es-ES", { weekday: "short" })
           .replace(".", ""),
-        date,
         minutes: minutesByDay.get(dayKey(date)) || 0,
       };
     });
+    const weekKeys = new Set(lastSevenDays.map((day) => day.key));
+    for (const session of sessions) {
+      if (weekKeys.has(dayKey(new Date(session.completed_at)))) {
+        const user = byUser.get(session.name || "Invitado");
+        user.week += Number(session.minutes) || 0;
+      }
+    }
+
     const weekMinutes = lastSevenDays.reduce((sum, day) => sum + day.minutes, 0);
-    const maxDay = Math.max(30, ...lastSevenDays.map((day) => day.minutes));
-    const activeDays = [...minutesByDay.values()].filter(Boolean).length;
+    const leaderboard = [...byUser.values()].sort(
+      (a, b) => b.week - a.week || b.minutes - a.minutes,
+    );
 
     return {
       totalMinutes,
@@ -99,12 +122,14 @@ export default function StatsPage() {
       weekMinutes,
       pomodoros,
       totalSessions: sessions.length,
-      average:
-        sessions.length > 0 ? Math.round(totalMinutes / sessions.length) : 0,
-      activeDays,
+      average: sessions.length ? Math.round(totalMinutes / sessions.length) : 0,
+      activeDays: [...minutesByDay.values()].filter(Boolean).length,
       streak: calculateStreak(minutesByDay),
+      people: byUser.size,
+      leaderboard,
+      maxUserWeek: Math.max(1, ...leaderboard.map((user) => user.week)),
       lastSevenDays,
-      maxDay,
+      maxDay: Math.max(30, ...lastSevenDays.map((day) => day.minutes)),
       recent: sessions.slice(0, 12),
     };
   }, [sessions]);
@@ -113,28 +138,42 @@ export default function StatsPage() {
     <div className="stats-page">
       <div className="stats-header stats-page-head">
         <div>
-          <span className="eyebrow">Tu progreso</span>
-          <h1>Estadísticas de enfoque</h1>
+          <span className="eyebrow">{isRoom ? `Sala ${roomCode}` : "Comunidad"}</span>
+          <h1>{isRoom ? "Progreso de la sala" : "Estadísticas compartidas"}</h1>
           <p>
-            Una vista sencilla de tu constancia, sin compararte con nadie más.
+            {isRoom
+              ? "El tiempo que habéis dedicado juntos dentro de esta sala."
+              : "Compara vuestro tiempo de enfoque y manteneos motivados entre amigos."}
           </p>
         </div>
-        <span className={`data-source ${hasFirebase ? "cloud" : "local"}`}>
-          <span /> {hasFirebase ? "Sincronizado con Firebase" : "Guardado localmente"}
-        </span>
+        <div className="stats-head-actions">
+          {isRoom && (
+            <Link href={`/room/${roomCode}`} className="btn btn-ghost">
+              Volver a la sala
+            </Link>
+          )}
+          <span className={`data-source ${hasFirebase ? "cloud" : "local"}`}>
+            <span /> {hasFirebase ? "Sincronizado" : "Guardado localmente"}
+          </span>
+        </div>
       </div>
 
       {error && <div className="banner">{error}</div>}
-      {!sessions && !error && <p className="empty-state">Preparando tus datos…</p>}
+      {!sessions && !error && <p className="empty-state">Preparando los datos…</p>}
 
       {stats && stats.totalSessions === 0 && (
         <div className="stats-empty card">
           <span className="stats-empty-mark">01</span>
-          <h2>Tu historial empieza con una sesión.</h2>
+          <h2>{isRoom ? "La sala todavía no tiene historial." : "El grupo todavía no tiene historial."}</h2>
           <p>
-            Completa un pomodoro y aquí aparecerán tu tiempo, tu ritmo semanal y
-            tu racha de concentración.
+            Cuando alguien complete un bloque de concentración aparecerá aquí
+            para que podáis seguir el progreso entre todos.
           </p>
+          {isRoom && (
+            <Link href={`/room/${roomCode}`} className="btn btn-primary">
+              Volver al temporizador
+            </Link>
+          )}
         </div>
       )}
 
@@ -144,7 +183,7 @@ export default function StatsPage() {
             <div className="summary-card featured">
               <span className="summary-index">01</span>
               <div className="value">{formatMinutes(stats.todayMinutes)}</div>
-              <div className="label">Concentración de hoy</div>
+              <div className="label">{isRoom ? "Enfoque de la sala hoy" : "Enfoque total hoy"}</div>
             </div>
             <div className="summary-card">
               <span className="summary-index">02</span>
@@ -154,9 +193,9 @@ export default function StatsPage() {
             <div className="summary-card">
               <span className="summary-index">03</span>
               <div className="value">
-                {stats.streak} {stats.streak === 1 ? "día" : "días"}
+                {stats.people} {stats.people === 1 ? "persona" : "personas"}
               </div>
-              <div className="label">Racha actual</div>
+              <div className="label">Han contribuido</div>
             </div>
             <div className="summary-card">
               <span className="summary-index">04</span>
@@ -170,7 +209,7 @@ export default function StatsPage() {
               <div className="stats-section-head">
                 <div>
                   <span className="eyebrow">Últimos siete días</span>
-                  <h2>Tu ritmo semanal</h2>
+                  <h2>{isRoom ? "Ritmo de la sala" : "Ritmo del grupo"}</h2>
                 </div>
                 <strong>{formatMinutes(stats.weekMinutes)}</strong>
               </div>
@@ -198,28 +237,33 @@ export default function StatsPage() {
             <aside className="card stats-details">
               <div className="stats-section-head">
                 <div>
-                  <span className="eyebrow">Resumen</span>
-                  <h2>Tu forma de trabajar</h2>
+                  <span className="eyebrow">Participantes</span>
+                  <h2>Aportación semanal</h2>
                 </div>
               </div>
-              <dl>
-                <div>
-                  <dt>Sesiones terminadas</dt>
-                  <dd>{stats.totalSessions}</dd>
-                </div>
-                <div>
-                  <dt>Pomodoros completados</dt>
-                  <dd>{stats.pomodoros}</dd>
-                </div>
-                <div>
-                  <dt>Duración media</dt>
-                  <dd>{formatMinutes(stats.average)}</dd>
-                </div>
-                <div>
-                  <dt>Días con actividad</dt>
-                  <dd>{stats.activeDays}</dd>
-                </div>
-              </dl>
+              <div className="room-ranking">
+                {stats.leaderboard.map((user) => (
+                  <div
+                    className={`room-ranking-row ${user.name === name ? "is-me" : ""}`}
+                    key={user.name}
+                  >
+                    <span className="avatar" style={{ background: avatarColor(user.name) }}>
+                      {user.name.charAt(0).toUpperCase()}
+                    </span>
+                    <div>
+                      <strong>
+                        {user.name}
+                        {user.name === name && <small className="ranking-me">Tú</small>}
+                      </strong>
+                      <span>{user.sessions} {user.sessions === 1 ? "sesión" : "sesiones"}</span>
+                      <div className="room-ranking-track">
+                        <span style={{ width: `${(user.week / stats.maxUserWeek) * 100}%` }} />
+                      </div>
+                    </div>
+                    <small>{formatMinutes(user.week)}</small>
+                  </div>
+                ))}
+              </div>
             </aside>
           </div>
 
@@ -231,30 +275,29 @@ export default function StatsPage() {
               </div>
             </div>
             <div className="feed personal-feed">
-              {stats.recent.map((session, index) => {
-                const date = new Date(session.completed_at);
-                return (
-                  <div className="feed-item" key={session.id ?? index}>
-                    <span
-                      className={`session-type-dot ${session.mode === "timer" ? "timer" : ""}`}
-                    />
-                    <span className="who">
-                      <strong>
-                        {session.mode === "pomodoro" ? "Pomodoro" : "Temporizador"}
-                      </strong>
-                      <small>{session.minutes} minutos de concentración</small>
-                    </span>
-                    {session.roomCode && (
-                      <span className="session-room">Sala {session.roomCode}</span>
-                    )}
-                    <span className="when">{timeAgo(date)}</span>
-                  </div>
-                );
-              })}
+              {stats.recent.map((session, index) => (
+                <div className="feed-item" key={session.id ?? index}>
+                  <span className={`session-type-dot ${session.mode === "timer" ? "timer" : ""}`} />
+                  <span className="who">
+                    <strong>
+                      {session.name} · {session.mode === "pomodoro" ? "Pomodoro" : "Temporizador"}
+                    </strong>
+                    <small>{session.minutes} minutos de concentración</small>
+                  </span>
+                  {!isRoom && session.roomCode && (
+                    <span className="session-room">Sala {session.roomCode}</span>
+                  )}
+                  <span className="when">{timeAgo(new Date(session.completed_at))}</span>
+                </div>
+              ))}
             </div>
           </section>
         </>
       )}
     </div>
   );
+}
+
+export default function StatsPage() {
+  return <StatsDashboard />;
 }

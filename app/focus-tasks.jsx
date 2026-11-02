@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { hasSupabase } from "../lib/supabaseClient";
 import { hasFirebase } from "../lib/firebaseClient";
 import { avatarColor } from "../lib/avatar";
 import { useTimer } from "./timer-context";
@@ -83,11 +82,9 @@ export default function FocusTasks() {
         <span />
         {roomSession
           ? "Visible en tiempo real para todas las personas de esta sala"
-          : hasSupabase
-            ? "Las personas conectadas pueden ver esta lista en tiempo real"
-            : hasFirebase
-              ? "Guardada en Firebase; se compartirá cuando entres en una sala"
-              : "Guardada en este dispositivo; se compartirá al entrar en una sala"}
+          : hasFirebase
+            ? "Guardada en Firebase; se compartirá cuando entres en una sala"
+            : "Guardada en este dispositivo; se compartirá al entrar en una sala"}
       </p>
     </section>
   );

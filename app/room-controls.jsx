@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { hasFirebase } from "../lib/firebaseClient";
@@ -169,6 +170,16 @@ export function RoomToolbar() {
         </span>
       </div>
       <div className="room-toolbar-actions">
+        <Link href={`/room/${roomSession.code}/stats`} className="btn btn-ghost">
+          Estadísticas
+        </Link>
+        <Link
+          href={`/overlay/${roomSession.code}`}
+          target="_blank"
+          className="btn btn-ghost"
+        >
+          Overlay OBS
+        </Link>
         <button type="button" className="btn" onClick={copy}>
           {copied ? "Enlace copiado" : "Copiar invitación"}
         </button>

@@ -106,16 +106,30 @@ Reinicia `npm run dev` después de crear `.env.local`.
 
 ## Historial y estadísticas
 
-Cada sesión terminada se guarda en el historial privado del usuario anónimo. Si
-se completa dentro de una sala, también se registra en el historial de esa sala
-para poder añadir estadísticas compartidas más adelante.
+Cada sesión terminada se guarda en un historial compartido para que el grupo de
+amigos pueda comparar tiempo, sesiones y actividad semanal. Si se completa
+dentro de una sala, también se registra en el historial específico de esa sala.
 
-Al abrir las estadísticas por primera vez, las sesiones que todavía existan en
-`localStorage` se migran automáticamente a Firebase una sola vez.
+Al abrir las estadísticas por primera vez, las sesiones antiguas de cada usuario
+y los datos que todavía existan en `localStorage` se migran automáticamente una
+sola vez al historial común.
 
-Supabase ya no se utiliza para guardar sesiones. Sus variables permanecen como
-compatibilidad temporal con el antiguo canal global de presencia y se eliminarán
-cuando toda la experiencia use exclusivamente salas privadas.
+Toda la persistencia y la colaboración en tiempo real utilizan Firebase. El
+proyecto ya no necesita una cuenta ni variables de Supabase.
+
+## Overlay para OBS
+
+Dentro de una sala, el botón **Overlay OBS** abre una vista transparente con:
+
+- Estado y fase actual.
+- Tiempo restante.
+- Progreso del bloque.
+- Participantes activos.
+- Tareas pendientes de cada persona.
+
+En OBS añade una **Fuente de navegador** con la URL `/overlay/CODIGO`. Un tamaño
+recomendado es `820 × 280`. La overlay solo observa la sala y no aparece como un
+participante adicional.
 
 ## Despliegue gratuito en Vercel
 
@@ -128,7 +142,6 @@ un nuevo despliegue automático.
 
 ## Próximos pasos
 
-- Estadísticas específicas para cada sala.
 - Recuperación del control cuando el anfitrión se desconecta.
 - Invitaciones directas y perfiles opcionales.
-- Overlay transparente para OBS con temporizador, estado y bullet list.
+- Variantes compacta y vertical de la overlay para OBS.

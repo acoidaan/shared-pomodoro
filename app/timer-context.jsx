@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import { saveSession } from "../lib/sessions";
-import { supabase } from "../lib/supabaseClient";
 
 export const CYCLES_BEFORE_LONG_BREAK = 4;
 
@@ -98,11 +97,6 @@ export function TimerProvider({ children }) {
   const [planDone, setPlanDone] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [tasks, setTasks] = useState([]);
-
-  // Sala en tiempo real (Supabase Presence)
-  const [friends, setFriends] = useState([]);
-  const [presenceReady, setPresenceReady] = useState(false);
-  const channelRef = useRef(null);
 
   const endAtRef = useRef(null);
   const intervalRef = useRef(null);
@@ -256,51 +250,6 @@ export function TimerProvider({ children }) {
     longBreakMin,
     totalPlanPomodoros,
   ]);
-
-  // ---- Sala en tiempo real -------------------------------------------------
-  // Cada cliente entra a un canal de presencia con su nombre como clave y
-  // publica su estado (fase, si corre, cuándo termina). No usa la base de
-  // datos: es un websocket efímero, al cerrar la pestaña desapareces solo.
-  useEffect(() => {
-    if (!supabase || !name.trim()) return;
-    const channel = supabase.channel("sala-comun", {
-      config: { presence: { key: name.trim() } },
-    });
-    channelRef.current = channel;
-    channel.on("presence", { event: "sync" }, () => {
-      const state = channel.presenceState();
-      setFriends(
-        Object.entries(state).map(([key, metas]) => ({
-          key,
-          ...metas[metas.length - 1],
-        })),
-      );
-    });
-    channel.subscribe((status) => {
-      if (status === "SUBSCRIBED") setPresenceReady(true);
-    });
-    return () => {
-      setPresenceReady(false);
-      setFriends([]);
-      supabase.removeChannel(channel);
-      channelRef.current = null;
-    };
-  }, [name]);
-
-  // Publicar mi estado cuando cambia algo relevante
-  useEffect(() => {
-    const channel = channelRef.current;
-    if (!channel || !presenceReady) return;
-    channel.track({
-      mode,
-      phase,
-      running,
-      endAt: running ? endAtRef.current : null,
-      total,
-      tasks,
-      updatedAt: Date.now(),
-    });
-  }, [presenceReady, running, phase, mode, total, tasks]);
 
   const handleComplete = useCallback(() => {
     setRunning(false);
@@ -509,19 +458,6 @@ export function TimerProvider({ children }) {
     }, 0);
   }, []);
 
-  // Engancharse a la sesión en curso de un amigo: mismo fin, mismo reloj.
-  const joinSession = useCallback((friend) => {
-    if (!friend.running || !friend.endAt || friend.endAt <= Date.now()) return;
-    unlockAudio();
-    setMode(friend.mode);
-    setPhase(friend.mode === "timer" ? "work" : friend.phase);
-    setPlanDone(false);
-    setTotal(friend.total);
-    setRemaining((friend.endAt - Date.now()) / 1000);
-    endAtRef.current = friend.endAt;
-    setRunning(true);
-  }, []);
-
   const value = {
     name,
     nameLoaded,
@@ -547,7 +483,6 @@ export function TimerProvider({ children }) {
     totalPlanPomodoros,
     planRemainingSeconds,
     saveError,
-    friends,
     tasks,
     addTask,
     toggleTask,
@@ -559,7 +494,6 @@ export function TimerProvider({ children }) {
     reset,
     skipPhase,
     switchMode,
-    joinSession,
   };
 
   return (
