@@ -9,6 +9,10 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  forgetActiveRoom,
+  rememberActiveRoom,
+} from "../lib/activeRoom";
 import { hasFirebase } from "../lib/firebaseClient";
 import {
   closeRoom as closeRoomData,
@@ -197,6 +201,14 @@ export function RoomProvider({ code, children }) {
   const isHost = Boolean(room && user && room.hostId === user.uid);
 
   useEffect(() => {
+    if (status === "ready") {
+      rememberActiveRoom(code);
+    } else if (["setup", "missing", "expired"].includes(status)) {
+      forgetActiveRoom(code);
+    }
+  }, [code, status]);
+
+  useEffect(() => {
     if (status !== "ready") return;
     timer.setSessionContext({ roomCode: code });
     return () => timer.setSessionContext(null);
@@ -256,12 +268,17 @@ export function RoomProvider({ code, children }) {
   ]);
 
   const leaveRoom = useCallback(async () => {
-    if (user) await removeRoomMember({ code, user });
+    try {
+      if (user) await removeRoomMember({ code, user });
+    } finally {
+      forgetActiveRoom(code);
+    }
   }, [code, user]);
 
   const closeRoom = useCallback(async () => {
     if (!isHost) return;
     await closeRoomData({ code });
+    forgetActiveRoom(code);
     setStatus("missing");
   }, [code, isHost]);
 

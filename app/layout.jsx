@@ -1,7 +1,7 @@
 import "./globals.css";
-import Link from "next/link";
 import { TimerProvider } from "./timer-context";
 import HeaderTimer from "./header-timer";
+import SiteLogo from "./site-logo";
 import SiteNav from "./site-nav";
 
 export const metadata = {
@@ -17,15 +17,7 @@ export default function RootLayout({ children }) {
         <TimerProvider>
           <header className="site-header">
             <div className="header-inner">
-              <Link href="/" className="logo" aria-label="Shared Pomodoro">
-                <span className="brand-mark" aria-hidden="true">
-                  <span className="brand-leaf" />
-                </span>
-                <span className="brand-copy">
-                  <strong>shared</strong>
-                  <small>pomodoro</small>
-                </span>
-              </Link>
+              <SiteLogo />
               <SiteNav />
               <div className="header-status">
                 <HeaderTimer />
