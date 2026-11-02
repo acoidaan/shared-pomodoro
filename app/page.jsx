@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useState } from "react";
 import { hasFirebase } from "../lib/firebaseClient";
 import { avatarColor } from "../lib/avatar";
 import FriendsPanel from "./friends-panel";
@@ -116,16 +116,20 @@ export default function TimerPage() {
   const [editingName, setEditingName] = useState(false);
   const [draftName, setDraftName] = useState("");
 
-  const [, refreshEstimate] = useReducer((x) => x + 1, 0);
+  const [estimateNow, setEstimateNow] = useState(null);
   useEffect(() => {
+    setEstimateNow(Date.now());
     if (running) return;
-    const id = setInterval(refreshEstimate, 30000);
-    return () => clearInterval(id);
+    const id = window.setInterval(() => setEstimateNow(Date.now()), 30000);
+    return () => window.clearInterval(id);
   }, [running]);
 
-  const finishAt = new Date(
-    Date.now() + planRemainingSeconds * 1000,
-  ).toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
+  const finishAt = estimateNow
+    ? new Date(estimateNow + planRemainingSeconds * 1000).toLocaleTimeString(
+        "es-ES",
+        { hour: "2-digit", minute: "2-digit" },
+      )
+    : "—";
 
   const currentPom = Math.min(
     planPos + (phase === "work" ? 1 : 0),
